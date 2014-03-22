@@ -37,7 +37,7 @@
 
 #include <errno.h>            // errno, perror()
 
-// Define a struct for ARP header
+// ARP header
 typedef struct _arp_hdr arp_hdr;
 struct _arp_hdr {
   uint16_t htype;
@@ -51,21 +51,65 @@ struct _arp_hdr {
   uint8_t target_ip[4];
 };
 
-// Define some constants.
 #define ETH_HDRLEN 14      // Ethernet header length
 #define IP4_HDRLEN 20      // IPv4 header length
 #define ARP_HDRLEN 28      // ARP header length
 #define ARPOP_REQUEST 1    // Taken from <linux/if_arp.h>
 #define ARPOP_REPLY 2	
 
-// Function prototypes
 char *allocate_strmem (int);
 uint8_t *allocate_ustrmem (int);
+int interface_lookup(char*, char*, struct ifreq*, uint8_t *, struct sockaddr_ll*); 
+
+int interface_lookup(char *interface, char *name, struct ifreq *ifr, uint8_t *src_mac, struct sockaddr_ll *device)
+{
+   int sd;
+   printf("Looking up interface\n");
+   strcpy(interface, name);
+  
+   // Submit request for a socket descriptor to look up interface.
+   if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+     perror ("socket() failed to get socket descriptor for using ioctl() ");
+     exit (EXIT_FAILURE);
+   }
+
+   // Use ioctl() to look up interface name and get its MAC address.
+   memset (ifr, 0, sizeof (*ifr));
+   snprintf (ifr->ifr_name, sizeof (ifr->ifr_name), "%s", interface);
+   if (ioctl (sd, SIOCGIFHWADDR, ifr) < 0) {
+     perror ("ioctl() failed to get source MAC address ");
+     return (EXIT_FAILURE);
+   }
+   close (sd);
+  
+   // Copy source MAC address.
+   memcpy (src_mac, ifr->ifr_hwaddr.sa_data, 6 * sizeof (uint8_t));
+
+   // Report source MAC address to stdout.
+   int i;
+   printf ("MAC address for interface %s is ", interface);
+   for (i=0; i<5; i++) {
+     printf ("%02x:", src_mac[i]);
+   }
+   printf ("%02x\n", src_mac[5]);
+
+   // Find interface index from interface name and store index in
+   // struct sockaddr_ll device, which will be used as an argument of sendto().
+   memset (device, 0, sizeof (device));
+   if ((device->sll_ifindex = if_nametoindex (interface)) == 0) {
+     perror ("if_nametoindex() failed to obtain interface index ");
+     exit (EXIT_FAILURE);
+   }
+   printf ("Index for interface %s is %i\n", interface, device->sll_ifindex);
+
+   return 0;
+} 
+
 
 int main (int argc, char **argv)
 {
 
-  printf("Sending...\n");
+  printf("Starting\n");
   int i, status, frame_length, sd, bytes;
   char *interface, *target, *src_ip;
   arp_hdr arphdr_out;
@@ -82,49 +126,15 @@ int main (int argc, char **argv)
   interface = allocate_strmem(40);
   target = allocate_strmem(40);
   src_ip = allocate_strmem(INET_ADDRSTRLEN);
-
-  // Interface to send packet through.
-  strcpy (interface, "wlan0");
-
-  // Submit request for a socket descriptor to look up interface.
-  if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-    perror ("socket() failed to get socket descriptor for using ioctl() ");
-    exit (EXIT_FAILURE);
-  }
-
-  // Use ioctl() to look up interface name and get its MAC address.
-  memset (&ifr, 0, sizeof (ifr));
-  snprintf (ifr.ifr_name, sizeof (ifr.ifr_name), "%s", interface);
-  if (ioctl (sd, SIOCGIFHWADDR, &ifr) < 0) {
-    perror ("ioctl() failed to get source MAC address ");
-    return (EXIT_FAILURE);
-  }
-  close (sd);
-
-  // Copy source MAC address.
-  memcpy (src_mac, ifr.ifr_hwaddr.sa_data, 6 * sizeof (uint8_t));
-
-  // Report source MAC address to stdout.
-  printf ("MAC address for interface %s is ", interface);
-  for (i=0; i<5; i++) {
-    printf ("%02x:", src_mac[i]);
-  }
-  printf ("%02x\n", src_mac[5]);
-
-  // Find interface index from interface name and store index in
-  // struct sockaddr_ll device, which will be used as an argument of sendto().
-  memset (&device, 0, sizeof (device));
-  if ((device.sll_ifindex = if_nametoindex (interface)) == 0) {
-    perror ("if_nametoindex() failed to obtain interface index ");
-    exit (EXIT_FAILURE);
-  }
-  printf ("Index for interface %s is %i\n", interface, device.sll_ifindex);
+  
+  // Look-up interface
+  interface_lookup(interface, "wlan0", &ifr, src_mac, &device);
 
   // Set destination MAC address: broadcast address
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
 
   // Source IPv4 address:  you need to fill this out
-  strcpy (src_ip, "160.39.10.165");
+  strcpy (src_ip, "86.67.83.71");
 
   // Destination URL or IPv4 address (must be a link-local node): you need to fill this out
   strcpy (target, "64.233.160.50");
