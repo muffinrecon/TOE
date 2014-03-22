@@ -34,7 +34,6 @@
 #include <linux/if_ether.h>   // ETH_P_ARP = 0x0806
 #include <linux/if_packet.h>  // struct sockaddr_ll (see man 7 packet)
 #include <net/ethernet.h>
-
 #include <errno.h>            // errno, perror()
 
 // ARP header
@@ -60,62 +59,19 @@ struct _arp_hdr {
 char *allocate_strmem (int);
 uint8_t *allocate_ustrmem (int);
 int interface_lookup(char*, char*, struct ifreq*, uint8_t *, struct sockaddr_ll*); 
-
-int interface_lookup(char *interface, char *name, struct ifreq *ifr, uint8_t *src_mac, struct sockaddr_ll *device)
-{
-   int sd;
-   printf("Looking up interface\n");
-   strcpy(interface, name);
-  
-   // Submit request for a socket descriptor to look up interface.
-   if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-     perror ("socket() failed to get socket descriptor for using ioctl() ");
-     exit (EXIT_FAILURE);
-   }
-
-   // Use ioctl() to look up interface name and get its MAC address.
-   memset (ifr, 0, sizeof (*ifr));
-   snprintf (ifr->ifr_name, sizeof (ifr->ifr_name), "%s", interface);
-   if (ioctl (sd, SIOCGIFHWADDR, ifr) < 0) {
-     perror ("ioctl() failed to get source MAC address ");
-     return (EXIT_FAILURE);
-   }
-   close (sd);
-  
-   // Copy source MAC address.
-   memcpy (src_mac, ifr->ifr_hwaddr.sa_data, 6 * sizeof (uint8_t));
-
-   // Report source MAC address to stdout.
-   int i;
-   printf ("MAC address for interface %s is ", interface);
-   for (i=0; i<5; i++) {
-     printf ("%02x:", src_mac[i]);
-   }
-   printf ("%02x\n", src_mac[5]);
-
-   // Find interface index from interface name and store index in
-   // struct sockaddr_ll device, which will be used as an argument of sendto().
-   memset (device, 0, sizeof (device));
-   if ((device->sll_ifindex = if_nametoindex (interface)) == 0) {
-     perror ("if_nametoindex() failed to obtain interface index ");
-     exit (EXIT_FAILURE);
-   }
-   printf ("Index for interface %s is %i\n", interface, device->sll_ifindex);
-
-   return 0;
-} 
-
+int listen_ARP(int, uint8_t *, arp_hdr *); 
+int fill_ARPhdr(arp_hdr *, char *);
 
 int main (int argc, char **argv)
 {
 
   printf("Starting\n");
-  int i, status, frame_length, sd, bytes;
+
+  int status, frame_length, sd, bytes;
   char *interface, *target, *src_ip;
   arp_hdr arphdr_out;
   uint8_t *src_mac, *dst_mac, *ether_frame;
   struct addrinfo hints, *res;
-  struct sockaddr_in *ipv4;
   struct sockaddr_ll device;
   struct ifreq ifr;
 
@@ -133,66 +89,7 @@ int main (int argc, char **argv)
   // Set destination MAC address: broadcast address
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
 
-  // Source IPv4 address:  you need to fill this out
-  strcpy (src_ip, "86.67.83.71");
-
-  // Destination URL or IPv4 address (must be a link-local node): you need to fill this out
-  strcpy (target, "64.233.160.50");
-
-  // Fill out hints for getaddrinfo().
-  memset (&hints, 0, sizeof (struct addrinfo));
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = hints.ai_flags | AI_CANONNAME;
-
-  // Source IP address
-  if ((status = inet_pton (AF_INET, src_ip, &arphdr_out.sender_ip)) != 1) {
-    fprintf (stderr, "inet_pton() source IP address.\nError message: %s", strerror (status));
-    exit (EXIT_FAILURE);
-  }
-
-  // Resolve target using getaddrinfo().
-  if ((status = getaddrinfo (target, NULL, &hints, &res)) != 0) {
-    fprintf (stderr, "getaddrinfo() failed: %s\n", gai_strerror (status));
-    exit (EXIT_FAILURE);
-  }
-  ipv4 = (struct sockaddr_in *) res->ai_addr;
-  memcpy (&arphdr_out.target_ip, &ipv4->sin_addr, 4 * sizeof (uint8_t));
-  freeaddrinfo (res);
-
-  // Fill out sockaddr_ll.
-  device.sll_family = AF_PACKET;
-  memcpy (device.sll_addr, src_mac, 6 * sizeof (uint8_t));
-  device.sll_halen = htons (6);
-
-  // ARP header
-
-  // Hardware type (16 bits): 1 for ethernet
-  arphdr_out.htype = htons (1);
-
-  // Protocol type (16 bits): 2048 for IP
-  arphdr_out.ptype = htons (ETH_P_IP);
-
-  // Hardware address length (8 bits): 6 bytes for MAC address
-  arphdr_out.hlen = 6;
-
-  // Protocol address length (8 bits): 4 bytes for IPv4 address
-  arphdr_out.plen = 4;
-
-  // OpCode: 1 for ARP request
-  arphdr_out.opcode = htons (ARPOP_REQUEST);
-
-  // Sender hardware address (48 bits): MAC address
-  memcpy (&arphdr_out.sender_mac, src_mac, 6 * sizeof (uint8_t));
-
-  // Sender protocol address (32 bits)
-  // See getaddrinfo() resolution of src_ip.
-
-  // Target hardware address (48 bits): zero, since we don't know it yet.
-  memset (&arphdr_out.target_mac, 0, 6 * sizeof (uint8_t));
-
-  // Target protocol address (32 bits)
-  // See getaddrinfo() resolution of target.
+  config_ipv4(src_ip, "86.67.83.71", target, "64.233.160.50", src_mac, &hints, res, &arphdr_out, &device);
 
   // Fill out ethernet frame header.
 
@@ -224,9 +121,97 @@ int main (int argc, char **argv)
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }	
-
   
+  listen_ARP(sd, ether_frame, &arphdr_out);
 
+  // Close socket descriptor.
+  close (sd);
+
+  // Free allocated memory.
+  free (src_mac);
+  free (dst_mac);
+  free (ether_frame);
+  free (interface);
+  free (target);
+  free (src_ip);
+
+  return (EXIT_SUCCESS);
+}
+
+int fill_ARPhdr(arp_hdr *arphdr_out, char *src_mac) 
+{
+  // Hardware type (16 bits): 1 for ethernet
+  arphdr_out->htype = htons (1);
+
+  // Protocol type (16 bits): 2048 for IP
+  arphdr_out->ptype = htons (ETH_P_IP);
+
+  // Hardware address length (8 bits): 6 bytes for MAC address
+  arphdr_out->hlen = 6;
+
+  // Protocol address length (8 bits): 4 bytes for IPv4 address
+  arphdr_out->plen = 4;
+
+  // OpCode: 1 for ARP request
+  arphdr_out->opcode = htons (ARPOP_REQUEST);
+
+  // Sender hardware address (48 bits): MAC address
+  memcpy (&arphdr_out->sender_mac, src_mac, 6 * sizeof (uint8_t));
+
+  // Sender protocol address (32 bits)
+  // See getaddrinfo() resolution of src_ip.
+
+  // Target hardware address (48 bits): zero, since we don't know it yet.
+  memset (&arphdr_out->target_mac, 0, 6 * sizeof (uint8_t));
+
+  // Target protocol address (32 bits)
+  // See getaddrinfo() resolution of target.
+  
+  return 0;
+}
+
+int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr, uint8_t *src_mac, struct addrinfo *hints, struct addrinfo *res, arp_hdr *arphdr_out, struct sockaddr_ll *device) 
+{
+  int status;
+  struct sockaddr_in *ipv4;
+
+  // Source IPv4 address:  you need to fill this out
+  strcpy (src_ip, src_ip_addr);
+
+  // Destination URL or IPv4 address (must be a link-local node): you need to fill this out
+  strcpy (target, trg_ip_addr);
+
+  // Fill out hints for getaddrinfo().
+  memset (hints, 0, sizeof (struct addrinfo));
+  hints->ai_family = AF_INET;
+  hints->ai_socktype = SOCK_STREAM;
+  hints->ai_flags = hints->ai_flags | AI_CANONNAME;
+
+  // Source IP address
+  if ((status = inet_pton (AF_INET, src_ip, arphdr_out->sender_ip)) != 1) {
+    fprintf (stderr, "inet_pton() source IP address.\nError message: %s", strerror (status));
+    exit (EXIT_FAILURE);
+  }
+
+  // Resolve target using getaddrinfo().
+  if ((status = getaddrinfo (target, NULL, hints, &res)) != 0) {
+    fprintf (stderr, "getaddrinfo() failed: %s\n", gai_strerror (status));
+    exit (EXIT_FAILURE);
+  }
+  ipv4 = (struct sockaddr_in *) res->ai_addr;
+  memcpy (arphdr_out->target_ip, &ipv4->sin_addr, 4 * sizeof (uint8_t));
+  freeaddrinfo (res);
+
+  // Fill out sockaddr_ll.
+  device->sll_family = AF_PACKET;
+  memcpy (device->sll_addr, src_mac, 6 * sizeof (uint8_t));
+  device->sll_halen = htons (6);
+	
+  return 0;
+}
+
+int listen_ARP(int sd, uint8_t *ether_frame, arp_hdr *arphrd_out) 
+{
   // Listen for incoming ethernet frame from socket sd.
   // We expect an ARP ethernet frame of the form:
   //     MAC (6 bytes) + MAC (6 bytes) + ethernet type (2 bytes)
@@ -234,6 +219,8 @@ int main (int argc, char **argv)
   // Keep at it until we get an ARP reply.
 
   printf("Receiving ... \n");
+
+  int status, i;
   arp_hdr *arp_pt_in;
   arp_pt_in = (arp_hdr *) (ether_frame + 6 + 6 + 2);
   while (((((ether_frame[12]) << 8) + ether_frame[13]) != ETH_P_ARP) || (ntohs (arp_pt_in->opcode) != ARPOP_REPLY)) {
@@ -283,24 +270,13 @@ int main (int argc, char **argv)
   printf ("%02x\n", arp_pt_in->target_mac[5]);
   printf ("Target (this node) protocol (IPv4) address: %u.%u.%u.%u\n",
     arp_pt_in->target_ip[0], arp_pt_in->target_ip[1], arp_pt_in->target_ip[2], arp_pt_in->target_ip[3]);
-  
-  // Close socket descriptor.
-  close (sd);
 
-  // Free allocated memory.
-  free (src_mac);
-  free (dst_mac);
-  free (ether_frame);
-  free (interface);
-  free (target);
-  free (src_ip);
-
-  return (EXIT_SUCCESS);
+  return 0;
 }
 
+
 // Allocate memory for an array of chars.
-char *
-allocate_strmem (int len)
+char *allocate_strmem (int len)
 {
   void *tmp;
 
@@ -320,8 +296,7 @@ allocate_strmem (int len)
 }
 
 // Allocate memory for an array of unsigned chars.
-uint8_t *
-allocate_ustrmem (int len)
+uint8_t *allocate_ustrmem (int len)
 {
   void *tmp;
 
@@ -339,3 +314,47 @@ allocate_ustrmem (int len)
     exit (EXIT_FAILURE);
   }
 }
+
+int interface_lookup(char *interface, char *name, struct ifreq *ifr, uint8_t *src_mac, struct sockaddr_ll *device)
+{
+   int sd;
+   printf("Looking up interface\n");
+   strcpy(interface, name);
+  
+   // Submit request for a socket descriptor to look up interface.
+   if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+     perror ("socket() failed to get socket descriptor for using ioctl() ");
+     exit (EXIT_FAILURE);
+   }
+
+   // Use ioctl() to look up interface name and get its MAC address.
+   memset (ifr, 0, sizeof (*ifr));
+   snprintf (ifr->ifr_name, sizeof (ifr->ifr_name), "%s", interface);
+   if (ioctl (sd, SIOCGIFHWADDR, ifr) < 0) {
+     perror ("ioctl() failed to get source MAC address ");
+     return (EXIT_FAILURE);
+   }
+   close (sd);
+  
+   // Copy source MAC address.
+   memcpy (src_mac, ifr->ifr_hwaddr.sa_data, 6 * sizeof (uint8_t));
+
+   // Report source MAC address to stdout.
+   int i;
+   printf ("MAC address for interface %s is ", interface);
+   for (i=0; i<5; i++) {
+     printf ("%02x:", src_mac[i]);
+   }
+   printf ("%02x\n", src_mac[5]);
+
+   // Find interface index from interface name and store index in
+   // struct sockaddr_ll device, which will be used as an argument of sendto().
+   memset (device, 0, sizeof (device));
+   if ((device->sll_ifindex = if_nametoindex (interface)) == 0) {
+     perror ("if_nametoindex() failed to obtain interface index ");
+     exit (EXIT_FAILURE);
+   }
+   printf ("Index for interface %s is %i\n", interface, device->sll_ifindex);
+
+   return 0;
+} 
