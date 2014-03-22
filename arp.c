@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <unistd.h>           // close()
 #include <string.h>           // strcpy, memset(), and memcpy()
-
 #include <netdb.h>            // struct addrinfo
 #include <sys/types.h>        // needed for socket(), uint8_t, uint16_t
 #include <sys/socket.h>       // needed for socket()
@@ -60,14 +59,14 @@ char *allocate_strmem (int);
 uint8_t *allocate_ustrmem (int);
 int interface_lookup(char*, char*, struct ifreq*, uint8_t *, struct sockaddr_ll*); 
 int listen_ARP(int, uint8_t *, arp_hdr *); 
-int fill_ARPhdr(arp_hdr *, char *);
+int fill_ARPhdr(arp_hdr *, uint8_t *);
 
 int main (int argc, char **argv)
 {
 
   printf("Starting\n");
 
-  int status, frame_length, sd, bytes;
+  int sd;
   char *interface, *target, *src_ip;
   arp_hdr arphdr_out;
   uint8_t *src_mac, *dst_mac, *ether_frame;
@@ -89,39 +88,14 @@ int main (int argc, char **argv)
   // Set destination MAC address: broadcast address
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
 
+  // Resolve ipv4 url if needed
   config_ipv4(src_ip, "86.67.83.71", target, "64.233.160.50", src_mac, &hints, res, &arphdr_out, &device);
 
-  // Fill out ethernet frame header.
+  // Fill out ARP packet
+  fill_ARPhdr(&arphdr_out, src_mac);
+    
+  sd = fill_send_ETHhdr(ether_frame, dst_mac, src_mac, &arphdr_out, &device);
 
-  // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (ARP header)
-  frame_length = 6 + 6 + 2 + ARP_HDRLEN;
-
-  // Destination and Source MAC addresses
-  memcpy (ether_frame, dst_mac, 6 * sizeof (uint8_t));
-  memcpy (ether_frame + 6, src_mac, 6 * sizeof (uint8_t));
-
-  // Next is ethernet type code (ETH_P_ARP for ARP).
-  // http://www.iana.org/assignments/ethernet-numbers
-  ether_frame[12] = ETH_P_ARP / 256;
-  ether_frame[13] = ETH_P_ARP % 256;
-
-  // Next is ethernet frame data (ARP header).
-
-  // ARP header
-  memcpy (ether_frame + ETH_HDRLEN, &arphdr_out, ARP_HDRLEN * sizeof (uint8_t));
-
-  // Submit request for a raw socket descriptor.
-  if ((sd = socket (PF_PACKET, SOCK_RAW, htons (ETH_P_ALL))) < 0) {
-    perror ("socket() failed ");
-    exit (EXIT_FAILURE);
-  }
-
-  // Send ethernet frame to socket.
-  if ((bytes = sendto (sd, ether_frame, frame_length, 0, (struct sockaddr *) &device, sizeof (device))) <= 0) {
-    perror ("sendto() failed");
-    exit (EXIT_FAILURE);
-  }	
-  
   listen_ARP(sd, ether_frame, &arphdr_out);
 
   // Close socket descriptor.
@@ -138,7 +112,7 @@ int main (int argc, char **argv)
   return (EXIT_SUCCESS);
 }
 
-int fill_ARPhdr(arp_hdr *arphdr_out, char *src_mac) 
+int fill_ARPhdr(arp_hdr *arphdr_out, uint8_t *src_mac) 
 {
   // Hardware type (16 bits): 1 for ethernet
   arphdr_out->htype = htons (1);
@@ -169,6 +143,44 @@ int fill_ARPhdr(arp_hdr *arphdr_out, char *src_mac)
   
   return 0;
 }
+
+int fill_send_ETHhdr(uint8_t *ether_frame, uint8_t *dst_mac, uint8_t *src_mac, arp_hdr *arphdr_out, struct sockaddr_ll *device) 
+{
+  int sd, frame_length, bytes;
+  // Fill out ethernet frame header.
+
+  // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (ARP header)
+  frame_length = 6 + 6 + 2 + ARP_HDRLEN;
+
+  // Destination and Source MAC addresses
+  memcpy (ether_frame, dst_mac, 6 * sizeof (uint8_t));
+  memcpy (ether_frame + 6, src_mac, 6 * sizeof (uint8_t));
+
+  // Next is ethernet type code (ETH_P_ARP for ARP).
+  // http://www.iana.org/assignments/ethernet-numbers
+  ether_frame[12] = ETH_P_ARP / 256;
+  ether_frame[13] = ETH_P_ARP % 256;
+
+  // Next is ethernet frame data (ARP header).
+
+  // ARP header
+  memcpy (ether_frame + ETH_HDRLEN, arphdr_out, ARP_HDRLEN * sizeof (uint8_t));
+
+  // Submit request for a raw socket descriptor.
+  if ((sd = socket (PF_PACKET, SOCK_RAW, htons (ETH_P_ALL))) < 0) {
+    perror ("socket() failed ");
+    exit (EXIT_FAILURE);
+  }
+
+  // Send ethernet frame to socket.
+  if ((bytes = sendto (sd, ether_frame, frame_length, 0, (struct sockaddr *) device, sizeof (struct sockaddr_ll))) <= 0) {
+    perror ("sendto() failed");
+    exit (EXIT_FAILURE);
+  }	
+
+  return sd;
+}
+
 
 int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr, uint8_t *src_mac, struct addrinfo *hints, struct addrinfo *res, arp_hdr *arphdr_out, struct sockaddr_ll *device) 
 {
