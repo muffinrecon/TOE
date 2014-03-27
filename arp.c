@@ -26,6 +26,8 @@
 #include <sys/socket.h>       // needed for socket()
 #include <netinet/in.h>       // IPPROTO_RAW, INET_ADDRSTRLEN
 #include <netinet/ip.h>       // IP_MAXPACKET (which is 65535)
+#include <netinet/tcp.h>  
+#define __FAVOR_BSD
 #include <arpa/inet.h>        // inet_pton() and inet_ntop()
 #include <sys/ioctl.h>        // macro ioctl is defined
 #include <bits/ioctls.h>      // defines values for argument "request" of ioctl.
@@ -58,7 +60,7 @@ struct _arp_hdr {
 char *allocate_strmem (int);
 uint8_t *allocate_ustrmem (int);
 int interface_lookup(char*, char*, struct ifreq*, uint8_t *, struct sockaddr_ll*); 
-int listen_ARP(int, uint8_t *, arp_hdr *); 
+int listen_ARP(int, uint8_t *, arp_hdr *, uint8_t *); 
 int fill_ARPhdr(arp_hdr *, uint8_t *);
 
 int main (int argc, char **argv)
@@ -89,14 +91,14 @@ int main (int argc, char **argv)
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
 
   // Resolve ipv4 url if needed
-  config_ipv4(src_ip, "86.67.83.71", target, "64.233.160.50", src_mac, &hints, res, &arphdr_out, &device);
+  config_ipv4(src_ip, "160.39.10.141", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device);
 
   // Fill out ARP packet
   fill_ARPhdr(&arphdr_out, src_mac);
     
   sd = fill_send_ETHhdr(ether_frame, dst_mac, src_mac, &arphdr_out, &device);
 
-  listen_ARP(sd, ether_frame, &arphdr_out);
+  listen_ARP(sd, ether_frame, &arphdr_out, dst_mac);
 
   // Close socket descriptor.
   close (sd);
@@ -222,7 +224,7 @@ int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr
   return 0;
 }
 
-int listen_ARP(int sd, uint8_t *ether_frame, arp_hdr *arphrd_out) 
+int listen_ARP(int sd, uint8_t *ether_frame, arp_hdr *arphrd_out, uint8_t *dst_mac) 
 {
   // Listen for incoming ethernet frame from socket sd.
   // We expect an ARP ethernet frame of the form:
@@ -247,6 +249,7 @@ int listen_ARP(int sd, uint8_t *ether_frame, arp_hdr *arphrd_out)
     }
   }
 
+  // DEBBUG - TO BE COMMENTED
   // Print out contents of received ethernet frame.
   printf ("\nEthernet frame header:\n");
   printf ("Destination MAC (this node): ");
@@ -283,6 +286,10 @@ int listen_ARP(int sd, uint8_t *ether_frame, arp_hdr *arphrd_out)
   printf ("Target (this node) protocol (IPv4) address: %u.%u.%u.%u\n",
     arp_pt_in->target_ip[0], arp_pt_in->target_ip[1], arp_pt_in->target_ip[2], arp_pt_in->target_ip[3]);
 
+  for (i = 0; i < 6; i++) dst_mac[i] = arp_pt_in-> sender_mac[i];
+  printf("dst_mac : ");
+  for (i = 0; i < 6; i++) printf("%02x:", dst_mac[i]);  
+  printf("\n"); 
   return 0;
 }
 
