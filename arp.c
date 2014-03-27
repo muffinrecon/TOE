@@ -52,6 +52,7 @@ struct _arp_hdr {
 };
 
 #define ETH_HDRLEN 14      // Ethernet header length
+#define TCP_HDRLEN 20
 #define IP4_HDRLEN 20      // IPv4 header length
 #define ARP_HDRLEN 28      // ARP header length
 #define ARPOP_REQUEST 1    // Taken from <linux/if_arp.h>
@@ -59,9 +60,13 @@ struct _arp_hdr {
 
 char *allocate_strmem (int);
 uint8_t *allocate_ustrmem (int);
+int *allocate_intmem (int);
+
 int interface_lookup(char*, char*, struct ifreq*, uint8_t *, struct sockaddr_ll*); 
 int listen_ARP(int, uint8_t *, arp_hdr *, uint8_t *); 
 int fill_ARPhdr(arp_hdr *, uint8_t *);
+
+uint16_t checksum (uint16_t *, int);
 
 int main (int argc, char **argv)
 {
@@ -69,12 +74,16 @@ int main (int argc, char **argv)
   printf("Starting\n");
 
   int sd;
-  char *interface, *target, *src_ip;
+  char *interface, *target, *src_ip, *dst_ip;
   arp_hdr arphdr_out;
   uint8_t *src_mac, *dst_mac, *ether_frame;
   struct addrinfo hints, *res;
   struct sockaddr_ll device;
   struct ifreq ifr;
+
+  struct ip iphdr; 
+  int *ip_flags; 
+  int status;
 
   // Allocate memory for various arrays.
   src_mac = allocate_ustrmem(6);
@@ -83,7 +92,9 @@ int main (int argc, char **argv)
   interface = allocate_strmem(40);
   target = allocate_strmem(40);
   src_ip = allocate_strmem(INET_ADDRSTRLEN);
-  
+  dst_ip = allocate_strmem(INET_ADDRSTRLEN);
+  ip_flags = allocate_intmem (4);
+    	
   // Look-up interface
   interface_lookup(interface, "wlan0", &ifr, src_mac, &device);
 
@@ -91,7 +102,7 @@ int main (int argc, char **argv)
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
 
   // Resolve ipv4 url if needed
-  config_ipv4(src_ip, "160.39.10.141", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device);
+  config_ipv4(src_ip, "160.39.10.141", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device, dst_ip);
 
   // Fill out ARP packet
   fill_ARPhdr(&arphdr_out, src_mac);
@@ -100,6 +111,62 @@ int main (int argc, char **argv)
 
   listen_ARP(sd, ether_frame, &arphdr_out, dst_mac);
 
+  //IPV4 header
+  // IPv4 header length (4 bits): Number of 32-bit words in header = 5
+  iphdr.ip_hl = IP4_HDRLEN / sizeof (uint32_t);
+
+  // Internet Protocol version (4 bits): IPv4
+  iphdr.ip_v = 4;
+
+  // Type of service (8 bits)
+  iphdr.ip_tos = 0;
+
+  // Total length of datagram (16 bits): IP header + TCP header
+  iphdr.ip_len = htons (IP4_HDRLEN + TCP_HDRLEN);
+
+  // ID sequence number (16 bits): unused, since single datagram
+  iphdr.ip_id = htons (0);
+
+  // Flags, and Fragmentation offset (3, 13 bits): 0 since single datagram
+
+  // Zero (1 bit)
+  ip_flags[0] = 0;
+
+  // Do not fragment flag (1 bit)
+  ip_flags[1] = 0;
+
+  // More fragments following flag (1 bit)
+  ip_flags[2] = 0;
+
+  // Fragmentation offset (13 bits)
+  ip_flags[3] = 0;
+
+  iphdr.ip_off = htons ((ip_flags[0] << 15)
+                      + (ip_flags[1] << 14)
+                      + (ip_flags[2] << 13)
+                      +  ip_flags[3]);
+
+  // Time-to-Live (8 bits): default to maximum value
+  iphdr.ip_ttl = 255;
+
+  // Transport layer protocol (8 bits): 6 for TCP
+  iphdr.ip_p = IPPROTO_TCP;
+
+  // Source IPv4 address (32 bits)
+  if ((status = inet_pton (AF_INET, src_ip, &(iphdr.ip_src))) != 1) {
+    fprintf (stderr, "inet_pton() failed 1.\nError message: %s", strerror (status));
+    exit (EXIT_FAILURE);
+  }
+
+  // Destination IPv4 address (32 bits)
+  if ((status = inet_pton (AF_INET, dst_ip, &(iphdr.ip_dst))) != 1) {
+    fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
+    exit (EXIT_FAILURE);
+  }
+
+  // IPv4 header checksum (16 bits): set to 0 when calculating checksum
+  iphdr.ip_sum = 0;
+  iphdr.ip_sum = checksum ((uint16_t *) &iphdr, IP4_HDRLEN);
   // Close socket descriptor.
   close (sd);
 
@@ -184,10 +251,11 @@ int fill_send_ETHhdr(uint8_t *ether_frame, uint8_t *dst_mac, uint8_t *src_mac, a
 }
 
 
-int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr, uint8_t *src_mac, struct addrinfo *hints, struct addrinfo *res, arp_hdr *arphdr_out, struct sockaddr_ll *device) 
+int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr, uint8_t *src_mac, struct addrinfo *hints, struct addrinfo *res, arp_hdr *arphdr_out, struct sockaddr_ll *device, char* dst_ip) 
 {
   int status;
   struct sockaddr_in *ipv4;
+  void *tmp;
 
   // Source IPv4 address:  you need to fill this out
   strcpy (src_ip, src_ip_addr);
@@ -213,7 +281,14 @@ int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr
     exit (EXIT_FAILURE);
   }
   ipv4 = (struct sockaddr_in *) res->ai_addr;
-  memcpy (arphdr_out->target_ip, &ipv4->sin_addr, 4 * sizeof (uint8_t));
+  tmp = &(ipv4->sin_addr);
+  memcpy (arphdr_out->target_ip, tmp, 4 * sizeof (uint8_t));
+  if (inet_ntop (AF_INET, tmp, dst_ip, INET_ADDRSTRLEN) == NULL) {
+	status = errno;
+	fprintf (stderr, "inet_ntop() failed.\n Error message: %s", strerror(status));
+	exit(EXIT_FAILURE);
+  }  
+
   freeaddrinfo (res);
 
   // Fill out sockaddr_ll.
@@ -377,3 +452,48 @@ int interface_lookup(char *interface, char *name, struct ifreq *ifr, uint8_t *sr
 
    return 0;
 } 
+
+
+// Allocate memory for an array of ints.
+int *allocate_intmem (int len)
+{
+  void *tmp;
+
+  if (len <= 0) {
+    fprintf (stderr, "ERROR: Cannot allocate memory because len = %i in allocate_intmem().\n", len);
+    exit (EXIT_FAILURE);
+  }
+
+  tmp = (int *) malloc (len * sizeof (int));
+  if (tmp != NULL) {
+    memset (tmp, 0, len * sizeof (int));
+    return (tmp);
+  } else {
+    fprintf (stderr, "ERROR: Cannot allocate memory for array allocate_intmem().\n");
+    exit (EXIT_FAILURE);
+  }
+}
+
+// Checksum function
+uint16_t checksum (uint16_t *addr, int len)
+{
+  int nleft = len;
+  int sum = 0;
+  uint16_t *w = addr;
+  uint16_t answer = 0;
+
+  while (nleft > 1) {
+    sum += *w++;
+    nleft -= sizeof (uint16_t);
+  }
+
+  if (nleft == 1) {
+    *(uint8_t *) (&answer) = *(uint8_t *) w;
+    sum += answer;
+  }
+
+  sum = (sum >> 16) + (sum & 0xFFFF);
+  sum += (sum >> 16);
+  answer = ~sum;
+  return (answer);
+}
