@@ -106,7 +106,7 @@ int main (int argc, char **argv)
   interface_lookup(interface, "wlan0", &ifr, src_mac, &device);
 
   // Resolve ipv4 url if needed
-  config_ipv4(src_ip, "160.39.10.141", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device, dst_ip);
+  config_ipv4(src_ip, "160.39.10.141", target, "160.39.223.19", src_mac, &hints, res, &arphdr_out, &device, dst_ip);
 
   // Set destination MAC address: broadcast address
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
@@ -182,7 +182,7 @@ int main (int argc, char **argv)
   tcphdr.th_sport = htons (60);
 
   // Destination port number (16 bits)
-  tcphdr.th_dport = htons (80);
+  tcphdr.th_dport = htons (5000);
 
   // Sequence number (32 bits)
   tcphdr.th_seq = htonl (0);
@@ -285,7 +285,7 @@ int main (int argc, char **argv)
   } 
 */
 
-  tcphdr *tcp_in;
+  /*tcphdr *tcp_in;
   tcp_in = (tcphdr *) (ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
   while (((((ether_frame[12]) << 8) + ether_frame[13]) != ETH_P_IP) || (ntohs (tcp->opcode) != ARPOP_REPLY)) {
   if ((status = recv (sd, ether_frame, IP_MAXPACKET, 0)) < 0) {
@@ -298,7 +298,7 @@ int main (int argc, char **argv)
       }
     }
   }
-
+  */
   // Close socket descriptor
   close (sd);
 
