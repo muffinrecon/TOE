@@ -105,18 +105,19 @@ int main (int argc, char **argv)
   // Look-up interface
   interface_lookup(interface, "wlan0", &ifr, src_mac, &device);
 
-  // Set destination MAC address: broadcast address
-  memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
-
   // Resolve ipv4 url if needed
   config_ipv4(src_ip, "160.39.10.141", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device, dst_ip);
 
+  // Set destination MAC address: broadcast address
+  memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
+  
   // Fill out ARP packet
   fill_ARPhdr(&arphdr_out, src_mac);
     
   sd = fill_send_ETHhdr(ether_frame, dst_mac, src_mac, &arphdr_out, &device);
 
   listen_ARP(sd, ether_frame, &arphdr_out, dst_mac);
+
 
   //IPV4 header
   // IPv4 header length (4 bits): Number of 32-bit words in header = 5
@@ -241,6 +242,7 @@ int main (int argc, char **argv)
   // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (IP header + TCP header)
   frame_length = 6 + 6 + 2 + IP4_HDRLEN + TCP_HDRLEN;
 
+
   // Destination and Source MAC addresses
   memcpy (ether_frame, dst_mac, 6 * sizeof (uint8_t));
   memcpy (ether_frame + 6, src_mac, 6 * sizeof (uint8_t));
@@ -264,7 +266,40 @@ int main (int argc, char **argv)
     exit (EXIT_FAILURE);
   }
 
-  // Close socket descriptor.
+  
+  printf("Receiving TCP... \n");
+
+/*  while(1) {
+    
+    if ((status = recv (sd, ether_frame, IP_MAXPACKET, 0)) < 0) {
+      printf("covered error");
+      if (errno == EINTR) {
+        memset (ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
+
+        continue;  // Something weird happened, but let's try again.
+     } else {
+        perror ("recv() failed:");
+        exit (EXIT_FAILURE);
+      }
+   }
+  } 
+*/
+
+  tcphdr *tcp_in;
+  tcp_in = (tcphdr *) (ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
+  while (((((ether_frame[12]) << 8) + ether_frame[13]) != ETH_P_IP) || (ntohs (tcp->opcode) != ARPOP_REPLY)) {
+  if ((status = recv (sd, ether_frame, IP_MAXPACKET, 0)) < 0) {
+      if (errno == EINTR) {
+        memset (ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
+        continue;  // Something weird happened, but let's try again.
+     } else {
+        perror ("recv() failed:");
+        exit (EXIT_FAILURE);
+      }
+    }
+  }
+
+  // Close socket descriptor
   close (sd);
 
   // Free allocated memory.
