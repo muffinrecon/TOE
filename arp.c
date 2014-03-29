@@ -265,40 +265,88 @@ int main (int argc, char **argv)
     exit (EXIT_FAILURE);
   }
 
-  
+ 
+  // Put more checks to verify that the packet received is an ACK 
   printf("Receiving TCP... \n");
 
-  /*while(1) {
-    
-  if ((status = recv (sd, ether_frame, IP_MAXPACKET, 0)) < 0) {
-    printf("covered error");
-    if (errno == EINTR) {
-        memset (ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
-
-        continue;  // Something weird happened, but let's try again.
-     } else {
-        perror ("recv() failed:");
-        exit (EXIT_FAILURE);
-      }
-   }
-  } 
-  */
-
-  /*tcphdr *tcp_in;
-  tcp_in = (tcphdr *) (ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
-  while (((((ether_frame[12]) << 8) + ether_frame[13]) != ETH_P_IP) || (ntohs (tcp->opcode) != ARPOP_REPLY)) {
-  if ((status = recv (sd, ether_frame, IP_MAXPACKET, 0)) < 0) {
-      if (errno == EINTR) {
-        memset (ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
-        continue;  // Something weird happened, but let's try again.
-     } else {
-        perror ("recv() failed:");
-        exit (EXIT_FAILURE);
-      }
+  struct tcphdr *tcp_in;
+  tcp_in = (struct tcphdr *) (ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
+  struct ip *ip_in;
+  ip_in = (struct ip *) (ether_frame + 6 + 6 + 2);
+  while (((((ether_frame[12]) << 8) + ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip_in->ip_src)) != *dst_ip)) {
+	if ((status = recv (sd, ether_frame, IP_MAXPACKET, 0)) < 0) {
+      	if (errno == EINTR) {
+       		 memset (ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
+       		 continue;  // Something weird happened, but let's try again.
+  	   } else {
+       	 perror ("recv() failed:");
+       	 exit (EXIT_FAILURE);
+     	 }
     }
   }
+
+  tcphdr.th_seq++;
+  tcphdr.th_ack++;  
+ 
+  // Flags (8 bits)
+
+  // FIN flag (1 bit)
+  tcp_flags[0] = 0;
+
+  // SYN flag (1 bit): set to 1
+  tcp_flags[1] = 0;
+
+  // RST flag (1 bit)
+  tcp_flags[2] = 0;
+
+  // PSH flag (1 bit)
+  tcp_flags[3] = 0;
+
+  // ACK flag (1 bit)
+  tcp_flags[4] = 1;
+
+  // URG flag (1 bit)
+  tcp_flags[5] = 0;
+
+  // ECE flag (1 bit)
+  tcp_flags[6] = 0;
+
+  // CWR flag (1 bit)
+  tcp_flags[7] = 0;
+
+  tcphdr.th_flags = 0;
+  for (i=0; i<8; i++) {
+    tcphdr.th_flags += (tcp_flags[i] << i);
+  }
+
+
+  // TCP checksum (16 bits)
+  tcphdr.th_sum = 0;
+  tcphdr.th_sum = tcp4_checksum (iphdr, tcphdr);
   
-  */
+  // Destination and Source MAC addresses
+  memcpy (ether_frame, dst_mac, 6 * sizeof (uint8_t));
+  memcpy (ether_frame + 6, src_mac, 6 * sizeof (uint8_t));
+
+  // Next is ethernet type code (ETH_P_IP for IPv4).
+  // http://www.iana.org/assignments/ethernet-numbers
+  ether_frame[12] = ETH_P_IP / 256;
+  ether_frame[13] = ETH_P_IP % 256;
+
+  // Next is ethernet frame data (IPv4 header + TCP header).
+
+  // IPv4 header
+  memcpy (ether_frame + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
+
+  // TCP header
+  memcpy (ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
+
+  // Send ethernet frame to socket.
+  if ((bytes = sendto (sd, ether_frame, frame_length, 0, (struct sockaddr *) &device, sizeof (device))) <= 0) {
+    perror ("sendto() failed");
+    exit (EXIT_FAILURE);
+  }
+
   close (sd);
 
   // Free allocated memory.
