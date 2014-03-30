@@ -285,8 +285,8 @@ int main (int argc, char **argv)
     }
   }
 
-  tcphdr.th_seq++;
-  tcphdr.th_ack++;  
+  tcphdr.th_seq= htonl(1 + ntohl(tcphdr.th_seq));
+  tcphdr.th_ack =htonl(1 + ntohl(tcp_in->th_seq));  
  
   // Flags (8 bits)
 
