@@ -23,28 +23,26 @@
 #define IP4_HDRLEN 20		// IPv4 header length
 #define TCP_HDRLEN 20		// TCP header length	
 
-struct tcp_pcb {
+struct tcp_ctrl {
 	int sd;
 	char *interface, *target, *src_ip, *dst_ip;
 	uint8_t *src_mac, *dst_mac, *ether_frame_in, *ether_frame_out;
-	int *ip_flags, *tcp_flags;
-	uint16_t in_port, out_port;
 	struct sockaddr_ll device;
-	int seq;
-	uint16_t sport;
-	uint16_t dport; 
+	uint16_t sport, dport;
+	int seq, ack, mtu;
+	struct tcphdr *tcphdr;
+	struct ip *iphdr; 
 };
 
-void tcp_tmr(void);
 
 // connection
-struct tcp_pcb *tcp_new(void);
-int tcp_bind(struct tcp_pcb*, char*, uint16_t, char*);
-struct tcp_pcb *tcp_listen(struct tcp_pcb *);
-void tcp_accept(struct tcp_pcb *);
-int tcp_connect(struct tcp_pcb *, char *);
+struct tcp_ctrl *tcp_new(void);
+int tcp_bind(struct tcp_ctrl*, char*, uint16_t, char*);
+struct tcp_ctrl *tcp_listen(struct tcp_ctrl *);
+void tcp_accept(struct tcp_ctrl *);
+void tcp_connect(struct tcp_ctrl *, char *);
 
 // Sending TCP data 
-void tcp_sent (struct tcp_pcb *);
+void tcp_sent(struct tcp_ctrl *);
 void tcp_sndbuf(void);
 void tcp_write(void);

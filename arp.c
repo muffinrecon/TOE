@@ -106,7 +106,7 @@ int main (int argc, char **argv)
   interface_lookup(interface, "wlan0", &ifr, src_mac, &device);
 
   // Resolve ipv4 url if needed
-  config_ipv4(src_ip, "160.39.10.135", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device, dst_ip);
+  config_ipv4(src_ip, "209.2.233.150", target, "www.google.com", src_mac, &hints, res, &arphdr_out, &device, dst_ip);
 
   // Set destination MAC address: broadcast address
   memset (dst_mac, 0xff, 6 * sizeof (uint8_t));
@@ -175,7 +175,7 @@ int main (int argc, char **argv)
   iphdr.ip_sum = 0;
   iphdr.ip_sum = checksum ((uint16_t *) &iphdr, IP4_HDRLEN);
 
-  // TCP header
+// TCP header
 
   // Source port number (16 bits)
   tcphdr.th_sport = htons (52946);
@@ -266,7 +266,6 @@ int main (int argc, char **argv)
   }
 
  
-  // Put more checks to verify that the packet received is an ACK 
   printf("Receiving TCP... \n");
 
   struct tcphdr *tcp_in;
@@ -464,12 +463,6 @@ int config_ipv4(char* src_ip, char* src_ip_addr, char* target, char* trg_ip_addr
   ipv4 = (struct sockaddr_in *) res->ai_addr;
   tmp = &(ipv4->sin_addr);
   memcpy (arphdr_out->target_ip, tmp, 4 * sizeof (uint8_t));
-  if (inet_ntop (AF_INET, tmp, dst_ip, INET_ADDRSTRLEN) == NULL) {
-	status = errno;
-	fprintf (stderr, "inet_ntop() failed.\n Error message: %s", strerror(status));
-	exit(EXIT_FAILURE);
-  }  
-
   freeaddrinfo (res);
 
   // Fill out sockaddr_ll.
