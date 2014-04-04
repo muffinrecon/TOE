@@ -9,47 +9,47 @@ uint16_t checksum (uint16_t *, int);
 uint16_t tcp4_checksum (struct ip, struct tcphdr);
 
 // Establishing connection
-void sd_ARP_rq(struct tcp_pcb *);
-void rcv_ARP_asw(struct tcp_pcb *);
-void sd_SYN_pck(struct tcp_pcb *);
-int rcv_SYNACK_pck(struct tcp_pcb *);
-void sd_ACK_pck(struct tcp_pcb *, int);
+void sd_ARP_rq(struct tcp_ctrl *);
+void rcv_ARP_asw(struct tcp_ctrl *);
+void sd_SYN_pck(struct tcp_ctrl *);
+int rcv_SYNACK_pck(struct tcp_ctrl *);
+void sd_ACK_pck(struct tcp_ctrl *, int);
 
-struct tcp_pcb *tcp_new (void) {
-	struct tcp_pcb *tcp_pcb = malloc(sizeof(struct tcp_pcb));
-	if (tcp_pcb == NULL) {
+struct tcp_ctrl *tcp_new (void) {
+	struct tcp_ctrl *tcp_ctrl = malloc(sizeof(struct tcp_ctrl));
+	if (tcp_ctrl == NULL) {
 		perror("malloc() failed");
 		exit (EXIT_FAILURE);	
 	}
 
-	tcp_pcb -> seq = random();
+	tcp_ctrl -> seq = random();
   	// Allocate memory for various arrays.
-  	tcp_pcb->src_mac = allocate_ustrmem(6);
-  	tcp_pcb->dst_mac = allocate_ustrmem(6);
-  	tcp_pcb->ether_frame_in = allocate_ustrmem(IP_MAXPACKET);
-  	tcp_pcb->ether_frame_out = allocate_ustrmem(IP_MAXPACKET);
-  	tcp_pcb->interface = allocate_strmem(40);
-  	tcp_pcb->target = allocate_strmem(40);
-  	tcp_pcb->src_ip = allocate_strmem(INET_ADDRSTRLEN);
-  	tcp_pcb->dst_ip = allocate_strmem(INET_ADDRSTRLEN);
-  	tcp_pcb->ip_flags = allocate_intmem (4);
-  	tcp_pcb->tcp_flags = allocate_intmem (8); 
+  	tcp_ctrl->src_mac = allocate_ustrmem(6);
+  	tcp_ctrl->dst_mac = allocate_ustrmem(6);
+  	tcp_ctrl->ether_frame_in = allocate_ustrmem(IP_MAXPACKET);
+  	tcp_ctrl->ether_frame_out = allocate_ustrmem(IP_MAXPACKET);
+  	tcp_ctrl->interface = allocate_strmem(40);
+  	tcp_ctrl->target = allocate_strmem(40);
+  	tcp_ctrl->src_ip = allocate_strmem(INET_ADDRSTRLEN);
+  	tcp_ctrl->dst_ip = allocate_strmem(INET_ADDRSTRLEN);
+  	tcp_ctrl->ip_flags = allocate_intmem (4);
+  	tcp_ctrl->tcp_flags = allocate_intmem (8); 
 
-	if ((tcp_pcb->sd = socket (PF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
+	if ((tcp_ctrl->sd = socket (PF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
 		perror ("socket() failed");
 		exit (EXIT_FAILURE);
 	} 
-	return tcp_pcb;
+	return tcp_ctrl;
 }
 
-int tcp_bind (struct tcp_pcb* tcp_pcb, char *ip_addr, uint16_t port, char *interface) {
+int tcp_bind (struct tcp_ctrl* tcp_ctrl, char *ip_addr, uint16_t port, char *interface) {
 	//printf("Starting bind\n");
 	
 	int sd;
 	struct ifreq ifr;
 
-	strcpy (tcp_pcb->src_ip, ip_addr);	
-	strcpy (tcp_pcb->interface, interface);
+	strcpy (tcp_ctrl->src_ip, ip_addr);	
+	strcpy (tcp_ctrl->interface, interface);
 
 	if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
 		perror ("socket() failed to get socket descriptor for using ioctl()");
@@ -63,32 +63,32 @@ int tcp_bind (struct tcp_pcb* tcp_pcb, char *ip_addr, uint16_t port, char *inter
 		return (EXIT_FAILURE);
 	}
 	close(sd);
-	memcpy(tcp_pcb->src_mac, ifr.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
+	memcpy(tcp_ctrl->src_mac, ifr.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
 
 		
    	// DEBBUG Report source MAC address to stdout.
    	//int i;
    	//printf ("MAC address for interface %s is ", interface);
    	//for (i=0; i<5; i++) {
-     	//printf ("%02x:", tcp_pcb->src_mac[i]);
+     	//printf ("%02x:", tcp_ctrl->src_mac[i]);
   	//}
-  	//printf ("%02x\n", tcp_pcb->src_mac[5]);
+  	//printf ("%02x\n", tcp_ctrl->src_mac[5]);
 
 
    	// Find interface index from interface name and store index in
    	// struct sockaddr_ll device, which will be used as an argument of sendto().
   	
-	memset (&(tcp_pcb->device), 0, sizeof (struct sockaddr_ll));
-   	if (((tcp_pcb->device).sll_ifindex = if_nametoindex (tcp_pcb->interface)) == 0) {
+	memset (&(tcp_ctrl->device), 0, sizeof (struct sockaddr_ll));
+   	if (((tcp_ctrl->device).sll_ifindex = if_nametoindex (tcp_ctrl->interface)) == 0) {
    	  perror ("if_nametoindex() failed to obtain interface index ");
    	  exit (EXIT_FAILURE);
   	}
-   	printf ("Index for interface %s is %i\n", tcp_pcb->interface, (tcp_pcb->device).sll_ifindex);
+   	printf ("Index for interface %s is %i\n", tcp_ctrl->interface, (tcp_ctrl->device).sll_ifindex);
 
    return 0;
 }
 
-int tcp_connect(struct tcp_pcb *tcp_pcb, char* url) {
+int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 	
 	int status;
 
@@ -99,7 +99,7 @@ int tcp_connect(struct tcp_pcb *tcp_pcb, char* url) {
 	struct sockaddr_in *ipv4;
 	void *tmp;
 
-	strcpy(tcp_pcb->target, url);
+	strcpy(tcp_ctrl->target, url);
 
 	// Fill out hints for getaddrinfo()
 	memset(&hints, 0, sizeof(struct addrinfo));
@@ -108,31 +108,34 @@ int tcp_connect(struct tcp_pcb *tcp_pcb, char* url) {
 	hints.ai_flags = hints.ai_flags | AI_CANONNAME;
 
 	// Resolve target using getaddrinfo()
-   	if ((status = getaddrinfo(tcp_pcb->target, NULL, &hints, &res)) != 0) {
+   	if ((status = getaddrinfo(tcp_ctrl->target, NULL, &hints, &res)) != 0) {
 		fprintf (stderr, "getaddrinfo() failed: %s\n", gai_strerror(status));
 		exit(EXIT_FAILURE);
 	}
 	ipv4 = (struct sockaddr_in *) res->ai_addr;
 	tmp = &(ipv4 -> sin_addr);
-	tcp_pcb->dst_ip = inet_ntoa(ipv4->sin_addr);
+	tcp_ctrl->dst_ip = inet_ntoa(ipv4->sin_addr);
 	
 	freeaddrinfo(res);
 	
 	// Fill out sockaddr_ll.
-	(tcp_pcb->device).sll_family = AF_PACKET;
-	memcpy ((tcp_pcb->device).sll_addr, tcp_pcb->src_mac, 6 * sizeof (uint8_t));
-	(tcp_pcb->device).sll_halen = htons(6);	
+	(tcp_ctrl->device).sll_family = AF_PACKET;
+	memcpy ((tcp_ctrl->device).sll_addr, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
+	(tcp_ctrl->device).sll_halen = htons(6);	
 	
-	sd_ARP_rq(tcp_pcb);
-	rcv_ARP_asw(tcp_pcb);
-	sd_SYN_pck(tcp_pcb);
-	int ack = rcv_SYNACK_pck(tcp_pcb);
-	sd_ACK_pck(tcp_pcb, ack);
+	sd_ARP_rq(tcp_ctrl);
+	rcv_ARP_asw(tcp_ctrl);
+	sd_SYN_pck(tcp_ctrl);
+	int ack = rcv_SYNACK_pck(tcp_ctrl);
+	sd_ACK_pck(tcp_ctrl, ack);
 	
 	return 0;
 } 
 
-void sd_SYN_pck(struct tcp_pcb *tcp_pcb) {
+void tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
+}
+
+void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
   int status, i, frame_length, bytes;
 
   //IPV4 header
@@ -179,13 +182,13 @@ void sd_SYN_pck(struct tcp_pcb *tcp_pcb) {
   iphdr.ip_p = IPPROTO_TCP;
 
   // Source IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET,tcp_pcb->src_ip, &(iphdr.ip_src))) != 1) {
+  if ((status = inet_pton (AF_INET,tcp_ctrl->src_ip, &(iphdr.ip_src))) != 1) {
     fprintf (stderr, "inet_pton() failed 1.\nError message: %s", strerror (status));
     exit (EXIT_FAILURE);
   }
 
   // Destination IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET, tcp_pcb->dst_ip, &(iphdr.ip_dst))) != 1) {
+  if ((status = inet_pton (AF_INET, tcp_ctrl->dst_ip, &(iphdr.ip_dst))) != 1) {
     fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
     exit (EXIT_FAILURE);
   }
@@ -205,7 +208,7 @@ void sd_SYN_pck(struct tcp_pcb *tcp_pcb) {
   tcphdr.th_dport = htons (80);  // RE
 
   // Sequence number (32 bits)
-  tcphdr.th_seq = htonl (tcp_pcb->seq); 
+  tcphdr.th_seq = htonl (tcp_ctrl->seq); 
 
   // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
   tcphdr.th_ack = htonl (0);
@@ -264,43 +267,43 @@ void sd_SYN_pck(struct tcp_pcb *tcp_pcb) {
 
 
   // Destination and Source MAC addresses
-  memcpy (tcp_pcb->ether_frame_out, tcp_pcb->dst_mac, 6 * sizeof (uint8_t));
-  memcpy (tcp_pcb->ether_frame_out + 6, tcp_pcb->src_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   // Next is ethernet type code (ETH_P_IP for IPv4).
   // http://www.iana.org/assignments/ethernet-numbers
-  tcp_pcb->ether_frame_out[12] = ETH_P_IP / 256;
-  tcp_pcb->ether_frame_out[13] = ETH_P_IP % 256;
+  tcp_ctrl->ether_frame_out[12] = ETH_P_IP / 256;
+  tcp_ctrl->ether_frame_out[13] = ETH_P_IP % 256;
 
   // Next is ethernet frame data (IPv4 header + TCP header).
 
   // IPv4 header
-  memcpy (tcp_pcb->ether_frame_out + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
 
   // TCP header
-  memcpy (tcp_pcb->ether_frame_out + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 
   // Send ethernet frame to socket.
-  if ((bytes = sendto (tcp_pcb->sd, tcp_pcb->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_pcb->device), sizeof (struct sockaddr_ll))) <= 0) {
+  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }
   // printf("Packet sent");
 }
 
-int rcv_SYNACK_pck(struct tcp_pcb *tcp_pcb) {
+int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
  
   //printf ("Waiting for SYN/ACK"); 
   
   int status;
   struct tcphdr *tcphdr;
-  tcphdr= (struct tcphdr *) (tcp_pcb->ether_frame_in + 6 + 6 + 2 + IP4_HDRLEN);
+  tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame_in + 6 + 6 + 2 + IP4_HDRLEN);
   struct ip *ip;
-  ip = (struct ip *) (tcp_pcb->ether_frame_in + 6 + 6 + 2);
-  while (((((tcp_pcb->ether_frame_in[12]) << 8) + tcp_pcb->ether_frame_in[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_pcb->dst_ip))||(tcphdr->th_flags != 0x12)) {
-	if ((status = recv (tcp_pcb->sd, tcp_pcb->ether_frame_in, IP_MAXPACKET, 0)) < 0) {
+  ip = (struct ip *) (tcp_ctrl->ether_frame_in + 6 + 6 + 2);
+  while (((((tcp_ctrl->ether_frame_in[12]) << 8) + tcp_ctrl->ether_frame_in[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x12)) {
+	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame_in, IP_MAXPACKET, 0)) < 0) {
       		if (errno == EINTR) {
-       			memset (tcp_pcb->ether_frame_in, 0, IP_MAXPACKET * sizeof (uint8_t));
+       			memset (tcp_ctrl->ether_frame_in, 0, IP_MAXPACKET * sizeof (uint8_t));
        			continue;  // Something weird happened, but let's try again.
  		} else {
        			perror ("recv() failed:");
@@ -309,12 +312,12 @@ int rcv_SYNACK_pck(struct tcp_pcb *tcp_pcb) {
     	}
   }
 
-  tcp_pcb->seq++;
+  tcp_ctrl->seq++;
   return tcphdr->th_seq; 	
 }
 
 
-void sd_ACK_pck(struct tcp_pcb *tcp_pcb, int ack) {
+void sd_ACK_pck(struct tcp_ctrl *tcp_ctrl, int ack) {
   int status, i, frame_length, bytes;
 
   //IPV4 header
@@ -361,13 +364,13 @@ void sd_ACK_pck(struct tcp_pcb *tcp_pcb, int ack) {
   iphdr.ip_p = IPPROTO_TCP;
 
   // Source IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET,tcp_pcb->src_ip, &(iphdr.ip_src))) != 1) {
+  if ((status = inet_pton (AF_INET,tcp_ctrl->src_ip, &(iphdr.ip_src))) != 1) {
     fprintf (stderr, "inet_pton() failed 1.\nError message: %s", strerror (status));
     exit (EXIT_FAILURE);
   }
 
   // Destination IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET, tcp_pcb->dst_ip, &(iphdr.ip_dst))) != 1) {
+  if ((status = inet_pton (AF_INET, tcp_ctrl->dst_ip, &(iphdr.ip_dst))) != 1) {
     fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
     exit (EXIT_FAILURE);
   }
@@ -387,7 +390,7 @@ void sd_ACK_pck(struct tcp_pcb *tcp_pcb, int ack) {
   tcphdr.th_dport = htons (80);  // RE
 
   // Sequence number (32 bits)
-  tcphdr.th_seq= htonl(tcp_pcb->seq);
+  tcphdr.th_seq= htonl(tcp_ctrl->seq);
 
   // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
   tcphdr.th_ack =htonl(1 + ntohl(ack));  
@@ -446,37 +449,37 @@ void sd_ACK_pck(struct tcp_pcb *tcp_pcb, int ack) {
 
 
   // Destination and Source MAC addresses
-  memcpy (tcp_pcb->ether_frame_out, tcp_pcb->dst_mac, 6 * sizeof (uint8_t));
-  memcpy (tcp_pcb->ether_frame_out + 6, tcp_pcb->src_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   // Next is ethernet type code (ETH_P_IP for IPv4).
   // http://www.iana.org/assignments/ethernet-numbers
-  tcp_pcb->ether_frame_out[12] = ETH_P_IP / 256;
-  tcp_pcb->ether_frame_out[13] = ETH_P_IP % 256;
+  tcp_ctrl->ether_frame_out[12] = ETH_P_IP / 256;
+  tcp_ctrl->ether_frame_out[13] = ETH_P_IP % 256;
 
   // Next is ethernet frame data (IPv4 header + TCP header).
 
   // IPv4 header
-  memcpy (tcp_pcb->ether_frame_out + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
 
   // TCP header
-  memcpy (tcp_pcb->ether_frame_out + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 
   // Send ethernet frame to socket.
-  if ((bytes = sendto (tcp_pcb->sd, tcp_pcb->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_pcb->device), sizeof (struct sockaddr_ll))) <= 0) {
+  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }
 	
 }
 
-void sd_ARP_rq(struct tcp_pcb *tcp_pcb) {
+void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
 	
 	int status;
 	arp_hdr arphdr;
 		
   	// Set destination MAC address: broadcast address
-  	memset (tcp_pcb->dst_mac, 0xff, 6 * sizeof (uint8_t));
+  	memset (tcp_ctrl->dst_mac, 0xff, 6 * sizeof (uint8_t));
 
 	// Fill ARP header
 	// Hardware type (16 bits): 1 for ethernet
@@ -495,7 +498,7 @@ void sd_ARP_rq(struct tcp_pcb *tcp_pcb) {
  	 arphdr.opcode = htons (ARPOP_REQUEST);
 
   	// Sender hardware address (48 bits): MAC address
-  	memcpy (arphdr.sender_mac, tcp_pcb->src_mac, 6 * sizeof (uint8_t));
+  	memcpy (arphdr.sender_mac, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   	// Sender protocol address (32 bits)
  	// See getaddrinfo() resolution of src_ip.
@@ -504,7 +507,7 @@ void sd_ARP_rq(struct tcp_pcb *tcp_pcb) {
   	memset(arphdr.target_mac, 0, 6 * sizeof (uint8_t));
 
 	// Source IP address
-  	if ((status = inet_pton (AF_INET, tcp_pcb->src_ip, arphdr.sender_ip)) != 1) {
+  	if ((status = inet_pton (AF_INET, tcp_ctrl->src_ip, arphdr.sender_ip)) != 1) {
     		fprintf (stderr, "inet_pton() source IP address.\nError message: %s", strerror (status));
     		exit (EXIT_FAILURE);
   	}
@@ -517,27 +520,27 @@ void sd_ARP_rq(struct tcp_pcb *tcp_pcb) {
   	frame_length = 6 + 6 + 2 + ARP_HDRLEN;
 
   	// Destination and Source MAC addresses
- 	memcpy (tcp_pcb->ether_frame_out, tcp_pcb->dst_mac, 6 * sizeof (uint8_t));
-  	memcpy (tcp_pcb->ether_frame_out + 6, tcp_pcb->src_mac, 6 * sizeof (uint8_t));
+ 	memcpy (tcp_ctrl->ether_frame_out, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  	memcpy (tcp_ctrl->ether_frame_out + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   	// Next is ethernet type code (ETH_P_ARP for ARP).
   	// http://www.iana.org/assignments/ethernet-numbers
-  	tcp_pcb->ether_frame_out[12] = ETH_P_ARP / 256;
-  	tcp_pcb->ether_frame_out[13] = ETH_P_ARP % 256;
+  	tcp_ctrl->ether_frame_out[12] = ETH_P_ARP / 256;
+  	tcp_ctrl->ether_frame_out[13] = ETH_P_ARP % 256;
 
   	// Next is ethernet frame data (ARP header).
 
   	// ARP header
-	memcpy (tcp_pcb->ether_frame_out + ETH_HDRLEN, &arphdr, ARP_HDRLEN * sizeof (uint8_t));
+	memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN, &arphdr, ARP_HDRLEN * sizeof (uint8_t));
 
 	// Send ethernet frame to socket.
-  	if ((bytes = sendto (tcp_pcb->sd, tcp_pcb->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_pcb->device), sizeof (struct sockaddr_ll))) <= 0) {
+  	if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     		perror ("sendto() failed");
    		 exit (EXIT_FAILURE);
   	}	
 }
 
-void rcv_ARP_asw(struct tcp_pcb* tcp_pcb) {
+void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
 	
 	// Listen for incoming ethernet frame from socket sd.
   	// We expect an ARP ethernet frame of the form:
@@ -548,12 +551,12 @@ void rcv_ARP_asw(struct tcp_pcb* tcp_pcb) {
   	int status, i;
   	arp_hdr *arphdr;
 
-  	arphdr = (arp_hdr *) (tcp_pcb->ether_frame_in + 6 + 6 + 2);
+  	arphdr = (arp_hdr *) (tcp_ctrl->ether_frame_in + 6 + 6 + 2);
 
- 	while (((((tcp_pcb->ether_frame_in[12]) << 8) + tcp_pcb->ether_frame_in[13]) != ETH_P_ARP) || (ntohs (arphdr->opcode) != ARPOP_REPLY)) {
-    		if ((status = recv (tcp_pcb->sd, tcp_pcb->ether_frame_in, IP_MAXPACKET, 0)) < 0) {
+ 	while (((((tcp_ctrl->ether_frame_in[12]) << 8) + tcp_ctrl->ether_frame_in[13]) != ETH_P_ARP) || (ntohs (arphdr->opcode) != ARPOP_REPLY)) {
+    		if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame_in, IP_MAXPACKET, 0)) < 0) {
       			if (errno == EINTR) {
-        			memset (tcp_pcb->ether_frame_in, 0, IP_MAXPACKET * sizeof (uint8_t));
+        			memset (tcp_ctrl->ether_frame_in, 0, IP_MAXPACKET * sizeof (uint8_t));
       				continue;  // Something weird happened, but let's try again.
       			} else {
         			perror ("recv() failed:");
@@ -562,8 +565,8 @@ void rcv_ARP_asw(struct tcp_pcb* tcp_pcb) {
     		}
   	}
 
-  	for (i = 0; i < 6; i++) tcp_pcb->dst_mac[i]=arphdr-> sender_mac[i];
- 	for (i = 0; i < 6; i++) printf("%02x:", tcp_pcb->dst_mac[i]);  
+  	for (i = 0; i < 6; i++) tcp_ctrl->dst_mac[i]=arphdr-> sender_mac[i];
+ 	for (i = 0; i < 6; i++) printf("%02x:", tcp_ctrl->dst_mac[i]);  
  	printf("\n"); 
 	
 
@@ -572,18 +575,18 @@ void rcv_ARP_asw(struct tcp_pcb* tcp_pcb) {
  	printf ("\nEthernet frame header:\n");
   	printf ("Destination MAC (this node): ");
   	for (i=0; i<5; i++) {
-   		printf ("%02x:", tcp_pcb->ether_frame_in[i]);
+   		printf ("%02x:", tcp_ctrl->ether_frame_in[i]);
   	}
-  	printf ("%02x\n", tcp_pcb->ether_frame_in[5]);
+  	printf ("%02x\n", tcp_ctrl->ether_frame_in[5]);
   	printf ("Source MAC: ");
   	for (i=0; i<5; i++) {
-   		printf ("%02x:", tcp_pcb->ether_frame_in[i+6]);
+   		printf ("%02x:", tcp_ctrl->ether_frame_in[i+6]);
   	}
-  	printf ("%02x\n", tcp_pcb->ether_frame_in[11]);
+  	printf ("%02x\n", tcp_ctrl->ether_frame_in[11]);
 
   	// Next is ethernet type code (ETH_P_ARP for ARP).
   	// http://www.iana.org/assignments/ethernet-numbers
-  	printf ("Ethernet type code (2054 = ARP): %u\n", ((tcp_pcb->ether_frame_in[12]) << 8) + tcp_pcb->ether_frame_in[13]);
+  	printf ("Ethernet type code (2054 = ARP): %u\n", ((tcp_ctrl->ether_frame_in[12]) << 8) + tcp_ctrl->ether_frame_in[13]);
   	printf ("\nEthernet data (ARP header):\n");
   	printf ("Hardware type (1 = ethernet (10 Mb)): %u\n", ntohs (arphdr->htype));
   	printf ("Protocol type (2048 for IPv4 addresses): %u\n", ntohs (arphdr->ptype));
