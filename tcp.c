@@ -26,8 +26,7 @@ struct tcp_ctrl *tcp_new (void) {
   	// Allocate memory for various arrays.
   	tcp_ctrl->src_mac = allocate_ustrmem(6);
   	tcp_ctrl->dst_mac = allocate_ustrmem(6);
-  	tcp_ctrl->ether_frame_in = allocate_ustrmem(IP_MAXPACKET);
-  	tcp_ctrl->ether_frame_out = allocate_ustrmem(IP_MAXPACKET);
+  	tcp_ctrl->ether_frame = allocate_ustrmem(IP_MAXPACKET);
   	tcp_ctrl->interface = allocate_strmem(40);
   	tcp_ctrl->target = allocate_strmem(40);
   	tcp_ctrl->src_ip = allocate_strmem(INET_ADDRSTRLEN);
@@ -267,24 +266,24 @@ void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
 
 
   // Destination and Source MAC addresses
-  memcpy (tcp_ctrl->ether_frame_out, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
-  memcpy (tcp_ctrl->ether_frame_out + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   // Next is ethernet type code (ETH_P_IP for IPv4).
   // http://www.iana.org/assignments/ethernet-numbers
-  tcp_ctrl->ether_frame_out[12] = ETH_P_IP / 256;
-  tcp_ctrl->ether_frame_out[13] = ETH_P_IP % 256;
+  tcp_ctrl->ether_frame[12] = ETH_P_IP / 256;
+  tcp_ctrl->ether_frame[13] = ETH_P_IP % 256;
 
   // Next is ethernet frame data (IPv4 header + TCP header).
 
   // IPv4 header
-  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
 
   // TCP header
-  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 
   // Send ethernet frame to socket.
-  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
+  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }
@@ -297,13 +296,13 @@ int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
   
   int status;
   struct tcphdr *tcphdr;
-  tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame_in + 6 + 6 + 2 + IP4_HDRLEN);
+  tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
   struct ip *ip;
-  ip = (struct ip *) (tcp_ctrl->ether_frame_in + 6 + 6 + 2);
-  while (((((tcp_ctrl->ether_frame_in[12]) << 8) + tcp_ctrl->ether_frame_in[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x12)) {
-	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame_in, IP_MAXPACKET, 0)) < 0) {
+  ip = (struct ip *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
+  while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x12)) {
+	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
       		if (errno == EINTR) {
-       			memset (tcp_ctrl->ether_frame_in, 0, IP_MAXPACKET * sizeof (uint8_t));
+       			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
        			continue;  // Something weird happened, but let's try again.
  		} else {
        			perror ("recv() failed:");
@@ -449,24 +448,24 @@ void sd_ACK_pck(struct tcp_ctrl *tcp_ctrl, int ack) {
 
 
   // Destination and Source MAC addresses
-  memcpy (tcp_ctrl->ether_frame_out, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
-  memcpy (tcp_ctrl->ether_frame_out + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   // Next is ethernet type code (ETH_P_IP for IPv4).
   // http://www.iana.org/assignments/ethernet-numbers
-  tcp_ctrl->ether_frame_out[12] = ETH_P_IP / 256;
-  tcp_ctrl->ether_frame_out[13] = ETH_P_IP % 256;
+  tcp_ctrl->ether_frame[12] = ETH_P_IP / 256;
+  tcp_ctrl->ether_frame[13] = ETH_P_IP % 256;
 
   // Next is ethernet frame data (IPv4 header + TCP header).
 
   // IPv4 header
-  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
 
   // TCP header
-  memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
+  memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 
   // Send ethernet frame to socket.
-  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
+  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }
@@ -520,21 +519,21 @@ void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
   	frame_length = 6 + 6 + 2 + ARP_HDRLEN;
 
   	// Destination and Source MAC addresses
- 	memcpy (tcp_ctrl->ether_frame_out, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
-  	memcpy (tcp_ctrl->ether_frame_out + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
+ 	memcpy (tcp_ctrl->ether_frame, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  	memcpy (tcp_ctrl->ether_frame + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
   	// Next is ethernet type code (ETH_P_ARP for ARP).
   	// http://www.iana.org/assignments/ethernet-numbers
-  	tcp_ctrl->ether_frame_out[12] = ETH_P_ARP / 256;
-  	tcp_ctrl->ether_frame_out[13] = ETH_P_ARP % 256;
+  	tcp_ctrl->ether_frame[12] = ETH_P_ARP / 256;
+  	tcp_ctrl->ether_frame[13] = ETH_P_ARP % 256;
 
   	// Next is ethernet frame data (ARP header).
 
   	// ARP header
-	memcpy (tcp_ctrl->ether_frame_out + ETH_HDRLEN, &arphdr, ARP_HDRLEN * sizeof (uint8_t));
+	memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN, &arphdr, ARP_HDRLEN * sizeof (uint8_t));
 
 	// Send ethernet frame to socket.
-  	if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame_out, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
+  	if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     		perror ("sendto() failed");
    		 exit (EXIT_FAILURE);
   	}	
@@ -551,12 +550,12 @@ void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
   	int status, i;
   	arp_hdr *arphdr;
 
-  	arphdr = (arp_hdr *) (tcp_ctrl->ether_frame_in + 6 + 6 + 2);
+  	arphdr = (arp_hdr *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
 
- 	while (((((tcp_ctrl->ether_frame_in[12]) << 8) + tcp_ctrl->ether_frame_in[13]) != ETH_P_ARP) || (ntohs (arphdr->opcode) != ARPOP_REPLY)) {
-    		if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame_in, IP_MAXPACKET, 0)) < 0) {
+ 	while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_ARP) || (ntohs (arphdr->opcode) != ARPOP_REPLY)) {
+    		if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
       			if (errno == EINTR) {
-        			memset (tcp_ctrl->ether_frame_in, 0, IP_MAXPACKET * sizeof (uint8_t));
+        			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
       				continue;  // Something weird happened, but let's try again.
       			} else {
         			perror ("recv() failed:");
@@ -575,18 +574,18 @@ void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
  	printf ("\nEthernet frame header:\n");
   	printf ("Destination MAC (this node): ");
   	for (i=0; i<5; i++) {
-   		printf ("%02x:", tcp_ctrl->ether_frame_in[i]);
+   		printf ("%02x:", tcp_ctrl->ether_frame[i]);
   	}
-  	printf ("%02x\n", tcp_ctrl->ether_frame_in[5]);
+  	printf ("%02x\n", tcp_ctrl->ether_frame[5]);
   	printf ("Source MAC: ");
   	for (i=0; i<5; i++) {
-   		printf ("%02x:", tcp_ctrl->ether_frame_in[i+6]);
+   		printf ("%02x:", tcp_ctrl->ether_frame[i+6]);
   	}
-  	printf ("%02x\n", tcp_ctrl->ether_frame_in[11]);
+  	printf ("%02x\n", tcp_ctrl->ether_frame[11]);
 
   	// Next is ethernet type code (ETH_P_ARP for ARP).
   	// http://www.iana.org/assignments/ethernet-numbers
-  	printf ("Ethernet type code (2054 = ARP): %u\n", ((tcp_ctrl->ether_frame_in[12]) << 8) + tcp_ctrl->ether_frame_in[13]);
+  	printf ("Ethernet type code (2054 = ARP): %u\n", ((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]);
   	printf ("\nEthernet data (ARP header):\n");
   	printf ("Hardware type (1 = ethernet (10 Mb)): %u\n", ntohs (arphdr->htype));
   	printf ("Protocol type (2048 for IPv4 addresses): %u\n", ntohs (arphdr->ptype));

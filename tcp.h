@@ -26,7 +26,7 @@
 struct tcp_ctrl{
 	int sd;
 	char *interface, *target, *src_ip, *dst_ip;
-	uint8_t *src_mac, *dst_mac, *ether_frame_in, *ether_frame_out;
+	uint8_t *src_mac, *dst_mac, *ether_frame;
 	int *ip_flags, *tcp_flags;
 	uint16_t in_port, out_port;
 	struct sockaddr_ll device;
@@ -35,15 +35,17 @@ struct tcp_ctrl{
 	uint16_t dport; 
 };
 
-void tcp_tmr(void);
-
-// connection
+// Initiatiate connection
 struct tcp_ctrl *tcp_new(void);
 int tcp_bind(struct tcp_ctrl*, char*, uint16_t, char*);
+int tcp_connect(struct tcp_ctrl *, char *);
+
+// Accept connection
 struct tcp_ctrl *tcp_listen(struct tcp_ctrl *);
 void tcp_accept(struct tcp_ctrl *);
-int tcp_connect(struct tcp_ctrl *, char *);
 
 // Sending TCP data 
 uint16_t tcp_sndbuf(struct tcp_ctrl *);
 void tcp_write(struct tcp_ctrl *, void *, int);
+
+
