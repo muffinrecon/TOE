@@ -15,13 +15,12 @@ int main(int argc, char **argv) {
 	
 	printf("**************** HANDSHAKE COMPLETED ***********************\n");
 	
-	char *data = "Hello World!";	
+	char *data = "GET / HTTP/1.0\r\n\r\n";
 	tcp_write(tcp_ctrl, data, strlen(data));
 
 	printf("**************** DATA TRANSMISSION COMPLETED ***************\n");
 	
 	return 0;
-
 }
 
 
