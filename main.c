@@ -4,7 +4,7 @@ int main(int argc, char **argv) {
 	int status;
 	printf("Starting Main \n");
 	struct tcp_ctrl *tcp_ctrl = tcp_new();
-	if ((status = tcp_bind(tcp_ctrl, "209.2.233.248", 52000, "wlan0")) < 0){
+	if ((status = tcp_bind(tcp_ctrl, "209.2.233.147", 52000, "wlan0")) < 0){
 		perror("Couldn't bind socket to port\n");
 		exit(EXIT_FAILURE); 
 	} 

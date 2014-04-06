@@ -28,11 +28,10 @@ struct tcp_ctrl{
 	char *interface, *target, *src_ip, *dst_ip;
 	uint8_t *src_mac, *dst_mac, *ether_frame;
 	int *ip_flags, *tcp_flags;
-	uint16_t in_port, out_port;
 	struct sockaddr_ll device;
-	int seq;
-	uint16_t sport;
-	uint16_t dport; 
+	int seq, ack;
+	uint16_t sport, dport;
+	uint8_t *sdbuffer; 
 };
 
 // Initiatiate connection
@@ -46,6 +45,6 @@ void tcp_accept(struct tcp_ctrl *);
 
 // Sending TCP data 
 uint16_t tcp_sndbuf(struct tcp_ctrl *);
-void tcp_write(struct tcp_ctrl *, void *, int);
+int tcp_write(struct tcp_ctrl *, void *, int);
 
 
