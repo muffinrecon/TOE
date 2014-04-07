@@ -31,7 +31,8 @@ struct tcp_ctrl{
 	struct sockaddr_ll device;
 	int seq, ack;
 	uint16_t sport, dport;
-	uint8_t *sdbuffer; 
+	uint8_t *sdbuffer;
+	int mtu; 
 };
 
 // Initiatiate connection
