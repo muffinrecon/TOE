@@ -257,8 +257,8 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
   		tcphdr.th_seq= htonl(tcp_ctrl -> seq);
 
   		// Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
-		if (j == 0) { tcphdr.th_ack = htonl (tcp_ctrl -> ack); } 
-  		else tcphdr.th_ack =htonl(0);  
+		if ((j == 0)&(tcp_ctrl -> state = SYN_SENT))  { tcphdr.th_ack = htonl (tcp_ctrl -> ack); } 
+  		else tcphdr.th_ack = htonl(0);  
 
   		// Reserved (4 bits): should be 0
   		tcphdr.th_x2 = 0;
@@ -281,8 +281,7 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
   		tcp_flags[3] = 1;
 
   		// ACK flag (1 bit)
-  		tcp_flags[4] = (j == 0) ? 1 : 0;
-		printf("ACK %d : %d\n", j, tcp_flags[4]);
+  		tcp_flags[4] = ((j == 0)&&(tcp_ctrl -> state == SYN_SENT)) ? 1 : 0;
 
   		// URG flag (1 bit)
   		tcp_flags[5] = 0;
@@ -331,7 +330,7 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
   		// TCP header
   		memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 		
-		// DEBUG : Error here
+		// TO DO : DEBUG : Error here
 	
 		memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN + TCP_HDRLEN, tcp_ctrl->sdbuffer, len * sizeof(uint8_t));
   
@@ -342,7 +341,10 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
    	 	exit (EXIT_FAILURE);
  		}
 		tcp_ctrl -> seq += len;
+		if (tcp_ctrl -> state = SYN_SENT) tcp_ctrl -> state = OPEN;
 	}
+
+	// TO DO : Wait for the data to be acknowledged 
 
 	printf("Exiting : tcp_write()\n");
 
@@ -442,69 +444,70 @@ void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
   	tcp_flags[0] = 0;
 
   	// SYN flag (1 bit): set to 1
-  tcp_flags[1] = 1;
+  	tcp_flags[1] = 1;
 
-  // RST flag (1 bit)
-  tcp_flags[2] = 0;
+  	// RST flag (1 bit)
+  	tcp_flags[2] = 0;
 
-  // PSH flag (1 bit)
-  tcp_flags[3] = 0;
+  	// PSH flag (1 bit)
+  	tcp_flags[3] = 0;
 
-  // ACK flag (1 bit)
-  tcp_flags[4] = 0;
+  	// ACK flag (1 bit)
+  	tcp_flags[4] = 0;
 
-  // URG flag (1 bit)
-  tcp_flags[5] = 0;
+  	// URG flag (1 bit)
+  	tcp_flags[5] = 0;
 
-  // ECE flag (1 bit)
-  tcp_flags[6] = 0;
+  	// ECE flag (1 bit)
+  	tcp_flags[6] = 0;
 
-  // CWR flag (1 bit)
-  tcp_flags[7] = 0;
+  	// CWR flag (1 bit)
+  	tcp_flags[7] = 0;
 
-  tcphdr.th_flags = 0;
-  for (i=0; i<8; i++) {
-    tcphdr.th_flags += (tcp_flags[i] << i);
-  }
+  	tcphdr.th_flags = 0;
+  	for (i=0; i<8; i++) {
+    		tcphdr.th_flags += (tcp_flags[i] << i);
+  	}
 
-  // Window size (16 bits)
-  tcphdr.th_win = htons (14600);
+  	// Window size (16 bits)
+  	tcphdr.th_win = htons (14600);
 
-  // Urgent pointer (16 bits): 0 (only valid if URG flag is set)
-  tcphdr.th_urp = htons (0);
+  	// Urgent pointer (16 bits): 0 (only valid if URG flag is set)
+  	tcphdr.th_urp = htons (0);
 
-  // TCP checksum (16 bits)
-  tcphdr.th_sum = 0;
-  tcphdr.th_sum = tcp2_checksum (iphdr, tcphdr);
+  	// TCP checksum (16 bits)
+  	tcphdr.th_sum = 0;
+  	tcphdr.th_sum = tcp2_checksum (iphdr, tcphdr);
   
-  // Fill out ethernet frame header.
+  	// Fill out ethernet frame header.
 
-  // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (IP header + TCP header)
-  frame_length = 6 + 6 + 2 + IP4_HDRLEN + TCP_HDRLEN;
+  	// Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (IP header + TCP header)
+  	frame_length = 6 + 6 + 2 + IP4_HDRLEN + TCP_HDRLEN;
 
+	// Destination and Source MAC addresses
+  	memcpy (tcp_ctrl->ether_frame, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
+  	memcpy (tcp_ctrl->ether_frame + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
 
-  // Destination and Source MAC addresses
-  memcpy (tcp_ctrl->ether_frame, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
-  memcpy (tcp_ctrl->ether_frame + 6, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
+ 	// Next is ethernet type code (ETH_P_IP for IPv4).
+  	// http://www.iana.org/assignments/ethernet-numbers
+  	tcp_ctrl->ether_frame[12] = ETH_P_IP / 256;
+  	tcp_ctrl->ether_frame[13] = ETH_P_IP % 256;
 
-  // Next is ethernet type code (ETH_P_IP for IPv4).
-  // http://www.iana.org/assignments/ethernet-numbers
-  tcp_ctrl->ether_frame[12] = ETH_P_IP / 256;
-  tcp_ctrl->ether_frame[13] = ETH_P_IP % 256;
+  	// Next is ethernet frame data (IPv4 header + TCP header).
 
-  // Next is ethernet frame data (IPv4 header + TCP header).
+  	// IPv4 header
+  	memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
 
-  // IPv4 header
-  memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN, &iphdr, IP4_HDRLEN * sizeof (uint8_t));
+  	// TCP header
+  	memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 
-  // TCP header
-  memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
-
-  // Send ethernet frame to socket.
-  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
-    perror ("sendto() failed");
-    exit (EXIT_FAILURE);
-  }
+  	// Send ethernet frame to socket.
+  	if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
+    		perror ("sendto() failed");
+    		exit (EXIT_FAILURE);
+  	}
+	
+	tcp_ctrl -> state = SYN_SENT;
 	printf("Exiting : sd_SYN_pck()\n");
 }
 
