@@ -23,6 +23,8 @@
 #define IP4_HDRLEN 20		// IPv4 header length
 #define TCP_HDRLEN 20		// TCP header length	
 
+typedef enum {CLOSED, SYN_SENT, OPEN} state_t;
+
 struct tcp_ctrl{
 	int sd;
 	char *interface, *target, *src_ip, *dst_ip;
@@ -32,7 +34,8 @@ struct tcp_ctrl{
 	int seq, ack;
 	uint16_t sport, dport;
 	uint8_t *sdbuffer;
-	int mtu; 
+	int mtu;
+	state_t state; 
 };
 
 // Initiatiate connection

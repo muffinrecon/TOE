@@ -17,6 +17,8 @@ int rcv_SYNACK_pck(struct tcp_ctrl *);
 void sd_ACK_pck(struct tcp_ctrl *, int);
 
 struct tcp_ctrl *tcp_new (void) {
+	printf("Entering : tcp_new()\n");
+	
 	struct tcp_ctrl *tcp_ctrl = malloc(sizeof(struct tcp_ctrl));
 	if (tcp_ctrl == NULL) {
 		perror("malloc() failed");
@@ -26,6 +28,7 @@ struct tcp_ctrl *tcp_new (void) {
 	tcp_ctrl -> seq = random();
 	tcp_ctrl -> ack = 0;
 	tcp_ctrl -> mtu = 0;
+	tcp_ctrl -> state = CLOSED;
   	// Allocate memory for various arrays.
   	tcp_ctrl -> src_mac = allocate_ustrmem(6);
   	tcp_ctrl -> dst_mac = allocate_ustrmem(6);
@@ -42,11 +45,13 @@ struct tcp_ctrl *tcp_new (void) {
 		perror ("socket() failed");
 		exit (EXIT_FAILURE);
 	} 
+	
+	printf("Exiting : tcp_new()\n");
 	return tcp_ctrl;
 }
 
 int tcp_bind (struct tcp_ctrl* tcp_ctrl, char *ip_addr, uint16_t sport, char *interface) {
-	//printf("Starting bind\n");
+	printf("Entering : tcp_bind\n");
 	
 	int sd;
 	struct ifreq ifr;
@@ -99,10 +104,14 @@ int tcp_bind (struct tcp_ctrl* tcp_ctrl, char *ip_addr, uint16_t sport, char *in
  	printf ("Current MTU of interface %s is: %i\n", interface, tcp_ctrl -> mtu);
 	
 	close(sd);
+
+	printf("Exiting : tcp_bind()\n");
    return 0;
 }
 
 int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
+	
+	printf("Entering : tcp_connect()\n");
 	
 	int status;
 
@@ -144,22 +153,31 @@ int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 	int ack = rcv_SYNACK_pck(tcp_ctrl);
 	tcp_ctrl-> ack = ack;
 	sd_ACK_pck(tcp_ctrl, ack);
+
+	printf("Exiting tcp_connect()\n");
 	
 	return 0;
 } 
 
 int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
+	
+	printf("Entering : tcp_write()\n");
   
 	int status, i, frame_length;
 	int max_payload = tcp_ctrl->mtu - TCP_HDRLEN - IP4_HDRLEN - ETH_HDRLEN;
+	printf("max_payload : %d\n", max_payload);
 	
 	// TO DO : Change this value because there is actually no link between the size of the buffer and the maximum size of an IP packet
 	int bytes = (length < IP_MAXPACKET) ? length : IP_MAXPACKET;
+	printf("bytes : %d\n", bytes);
+	
 	memcpy(tcp_ctrl->sdbuffer, (uint8_t *) data, bytes);
 	int ip_id = random();
 	
 	int leftovers = bytes%max_payload;
-	int nframes = (leftovers == 0) ? (bytes/max_payload + 1): (bytes/max_payload);
+	printf("leftovers : %d\n", leftovers);
+	int nframes = (leftovers == 0) ? bytes/max_payload : (bytes/max_payload + 1);
+	printf("nframes : %d\n", nframes);
 
 	int j;
 	for (j = 0; j < nframes; j++) {  
@@ -177,11 +195,12 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
 
   		// Total length of datagram (16 bits): IP header + TCP header
 		// DEBUG : CHANGE THIS CONDITION
-		int len = (j == (nframes -1)) ? max_payload : leftovers; 
+		int len = (j == (nframes-1)) ? leftovers : max_payload;
+		printf("len : %d\n", len); 
   		iphdr.ip_len = htons (IP4_HDRLEN + TCP_HDRLEN + len); 
 
   		// ID sequence number (16 bits): unused, since single datagram
-  		iphdr.ip_id = htons (ip_id); 
+  		iphdr.ip_id = htons (0); 
 
   		// Flags, and Fragmentation offset (3, 13 bits): 0 since single datagram
 
@@ -192,7 +211,7 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
   		ip_flags[1] = 0;
 
   		// More fragments following flag (1 bit)
-  		ip_flags[2] = (j < (nframes - 1)) ? 1 : 0;
+  		ip_flags[2] = 0;
 
   		// Fragmentation offset (13 bits)
   		ip_flags[3] = 0;
@@ -238,7 +257,8 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
   		tcphdr.th_seq= htonl(tcp_ctrl -> seq);
 
   		// Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
-  		tcphdr.th_ack =htonl((j == 0) ? 0 : tcp_ctrl -> ack);  
+		if (j == 0) { tcphdr.th_ack = htonl (tcp_ctrl -> ack); } 
+  		else tcphdr.th_ack =htonl(0);  
 
   		// Reserved (4 bits): should be 0
   		tcphdr.th_x2 = 0;
@@ -262,6 +282,7 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
 
   		// ACK flag (1 bit)
   		tcp_flags[4] = (j == 0) ? 1 : 0;
+		printf("ACK %d : %d\n", j, tcp_flags[4]);
 
   		// URG flag (1 bit)
   		tcp_flags[5] = 0;
@@ -309,6 +330,8 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
 
   		// TCP header
   		memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN, &tcphdr, TCP_HDRLEN * sizeof (uint8_t));
+		
+		// DEBUG : Error here
 	
 		memcpy (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN + TCP_HDRLEN, tcp_ctrl->sdbuffer, len * sizeof(uint8_t));
   
@@ -321,99 +344,104 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
 		tcp_ctrl -> seq += len;
 	}
 
+	printf("Exiting : tcp_write()\n");
+
 	return bytes;
 }
 
 void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
-  int status, i, frame_length, bytes;
 
-  //IPV4 header
-  struct ip iphdr;
-  int ip_flags[4];
-  // IPv4 header length (4 bits): Number of 32-bit words in header = 5
-  iphdr.ip_hl = IP4_HDRLEN / sizeof (uint32_t);
+	printf("Entering : sd_SYN_pck()\n");
+	
+  	int status, i, frame_length, bytes;
 
-  // Internet Protocol version (4 bits): IPv4
-  iphdr.ip_v = 4;
+  	//IPV4 header
+  	struct ip iphdr;
+  	int ip_flags[4];
+  	// IPv4 header length (4 bits): Number of 32-bit words in header = 5
+  	iphdr.ip_hl = IP4_HDRLEN / sizeof (uint32_t);
 
-  // Type of service (8 bits)
-  iphdr.ip_tos = 0;
+ 	// Internet Protocol version (4 bits): IPv4
+  	iphdr.ip_v = 4;
 
-  // Total length of datagram (16 bits): IP header + TCP header
-  iphdr.ip_len = htons (IP4_HDRLEN + TCP_HDRLEN);
+  	// Type of service (8 bits)
+  	iphdr.ip_tos = 0;
 
-  // ID sequence number (16 bits): unused, since single datagram
-  iphdr.ip_id = htons (0);
+  	// Total length of datagram (16 bits): IP header + TCP header
+  	iphdr.ip_len = htons (IP4_HDRLEN + TCP_HDRLEN);
 
-  // Flags, and Fragmentation offset (3, 13 bits): 0 since single datagram
+  	// ID sequence number (16 bits): unused, since single datagram
+  	iphdr.ip_id = htons (0);
 
-  // Zero (1 bit)
-  ip_flags[0] = 0;
+  	// Flags, and Fragmentation offset (3, 13 bits): 0 since single datagram
 
-  // Do not fragment flag (1 bit)
-  ip_flags[1] = 0;
+  	// Zero (1 bit)
+  	ip_flags[0] = 0;
 
-  // More fragments following flag (1 bit)
-  ip_flags[2] = 0;
+  	// Do not fragment flag (1 bit)
+  	ip_flags[1] = 0;
 
-  // Fragmentation offset (13 bits)
-  ip_flags[3] = 0;
+  	// More fragments following flag (1 bit)
+  	ip_flags[2] = 0;
 
-  iphdr.ip_off = htons ((ip_flags[0] << 15)
+  	// Fragmentation offset (13 bits)
+  	ip_flags[3] = 0;
+
+  	iphdr.ip_off = htons ((ip_flags[0] << 15)
                       + (ip_flags[1] << 14)
                       + (ip_flags[2] << 13)
                       +  ip_flags[3]);
 
-  // Time-to-Live (8 bits): default to maximum value
-  iphdr.ip_ttl = 255;
+  	// Time-to-Live (8 bits): default to maximum value
+  	iphdr.ip_ttl = 255;
 
-  // Transport layer protocol (8 bits): 6 for TCP
-  iphdr.ip_p = IPPROTO_TCP;
+  	// Transport layer protocol (8 bits): 6 for TCP
+  	iphdr.ip_p = IPPROTO_TCP;
 
-  // Source IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET,tcp_ctrl->src_ip, &(iphdr.ip_src))) != 1) {
-    fprintf (stderr, "inet_pton() failed 1.\nError message: %s", strerror (status));
-    exit (EXIT_FAILURE);
-  }
+ 	// Source IPv4 address (32 bits)
+ 	if ((status = inet_pton (AF_INET,tcp_ctrl->src_ip, &(iphdr.ip_src))) != 1) {
+    		fprintf (stderr, "inet_pton() failed 1.\nError message: %s", strerror (status));
+    		exit (EXIT_FAILURE);
+  	}
 
-  // Destination IPv4 address (32 bits)
-  if ((status = inet_pton (AF_INET, tcp_ctrl->dst_ip, &(iphdr.ip_dst))) != 1) {
-    fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
-    exit (EXIT_FAILURE);
-  }
+  	// Destination IPv4 address (32 bits)
+  	if ((status = inet_pton (AF_INET, tcp_ctrl->dst_ip, &(iphdr.ip_dst))) != 1) {
+    		fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
+    		exit (EXIT_FAILURE);
+  	}
 
-  // IPv4 header checksum (16 bits): set to 0 when calculating checksum
-  iphdr.ip_sum = 0;
-  iphdr.ip_sum = checksum ((uint16_t *) &iphdr, IP4_HDRLEN);
+  	// IPv4 header checksum (16 bits): set to 0 when calculating checksum
+  	iphdr.ip_sum = 0;
+  	iphdr.ip_sum = checksum ((uint16_t *) &iphdr, IP4_HDRLEN);
 
-  // TCP header
-  struct tcphdr tcphdr;
-  int tcp_flags[8];
+  	// TCP header
+  	struct tcphdr tcphdr;
+  	int tcp_flags[8];
 
-  // Source port number (16 bits)
-  tcphdr.th_sport = htons (52000); // REPLACE BY TCP_PCB
+  	// Source port number (16 bits)
+  	tcphdr.th_sport = htons (52000); // REPLACE BY TCP_PCB
 
-  // Destination port number (16 bits)
-  tcphdr.th_dport = htons (80);  // RE
+ 	// Destination port number (16 bits)
+  	tcphdr.th_dport = htons (80);  // RE
 
-  // Sequence number (32 bits)
-  tcphdr.th_seq = htonl (tcp_ctrl->seq); 
+  	// Sequence number (32 bits)
+  	tcphdr.th_seq = htonl (tcp_ctrl->seq); 
 
-  // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
-  tcphdr.th_ack = htonl (0);
+  	// Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
+  	tcphdr.th_ack = htonl (0);
 
-  // Reserved (4 bits): should be 0
-  tcphdr.th_x2 = 0;
+  	// Reserved (4 bits): should be 0
+  	tcphdr.th_x2 = 0;
 
-  // Data offset (4 bits): size of TCP header in 32-bit words
-  tcphdr.th_off = TCP_HDRLEN / 4;
+  	// Data offset (4 bits): size of TCP header in 32-bit words
+  	tcphdr.th_off = TCP_HDRLEN / 4;
 
-  // Flags (8 bits)
+  	// Flags (8 bits)
 
-  // FIN flag (1 bit)
-  tcp_flags[0] = 0;
+  	// FIN flag (1 bit)
+  	tcp_flags[0] = 0;
 
-  // SYN flag (1 bit): set to 1
+  	// SYN flag (1 bit): set to 1
   tcp_flags[1] = 1;
 
   // RST flag (1 bit)
@@ -477,12 +505,12 @@ void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }
-  // printf("Packet sent");
+	printf("Exiting : sd_SYN_pck()\n");
 }
 
 int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
- 
-  //printf ("Waiting for SYN/ACK"); 
+  
+  printf("Entering : rcv_SYNACK_pck()\n");
   
   int status;
   struct tcphdr *tcphdr;
