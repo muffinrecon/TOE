@@ -2,11 +2,10 @@
 
 int main(int argc, char **argv) {
 	int status;
-	FILE *fi;
 
 	printf("Starting Main \n");
 	struct tcp_ctrl *tcp_ctrl = tcp_new();
-	if ((status = tcp_bind(tcp_ctrl, "209.2.232.222", 52000, "wlan0")) < 0){
+	if ((status = tcp_bind(tcp_ctrl, "209.2.233.196", 52000, "wlan0")) < 0){
 		perror("Couldn't bind socket to port\n");
 		exit(EXIT_FAILURE); 
 	} 
@@ -17,17 +16,11 @@ int main(int argc, char **argv) {
 	
 	printf("**************** HANDSHAKE COMPLETED ***********************\n");
 	
-	fi = fopen("data", "r");
-	char *data_ptr = malloc(20000 * sizeof(uint8_t));
-	int i = 0;
-	char c;
-	while((c = fgetc(fi)) != EOF){
-		data_ptr[i] = c;
-		i++;
-	} 
+	char *data1 = "GET / HTTP/1.0\r\n";
+	tcp_write(tcp_ctrl, data1, strlen(data1));
 	
-
-	tcp_write(tcp_ctrl, data_ptr, i);
+	char *data2 = "\r\n";
+	tcp_write(tcp_ctrl, data2, strlen(data2));
 
 	printf("**************** DATA TRANSMISSION COMPLETED ***************\n");
 	

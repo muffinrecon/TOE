@@ -14,6 +14,7 @@ void sd_ARP_rq(struct tcp_ctrl *);
 void rcv_ARP_asw(struct tcp_ctrl *);
 void sd_SYN_pck(struct tcp_ctrl *);
 int rcv_SYNACK_pck(struct tcp_ctrl *);
+void rcv_ACK_pck(struct tcp_ctrl *);
 void sd_ACK_pck(struct tcp_ctrl *, int);
 
 struct tcp_ctrl *tcp_new (void) {
@@ -115,9 +116,6 @@ int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 	
 	int status;
 
-	// Replace by
-	//resolve_target();
-
 	struct addrinfo hints, *res;
 	struct sockaddr_in *ipv4;
 	void *tmp;
@@ -174,9 +172,9 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
 	memcpy(tcp_ctrl->sdbuffer, (uint8_t *) data, bytes);
 	int ip_id = random();
 	
-	int leftovers = bytes%max_payload;
-	printf("leftovers : %d\n", leftovers);
-	int nframes = (leftovers == 0) ? bytes/max_payload : (bytes/max_payload + 1);
+	int remainder = bytes%max_payload;
+	printf("remainder : %d\n", remainder);
+	int nframes = (remainder == 0) ? bytes/max_payload : (bytes/max_payload + 1);
 	printf("nframes : %d\n", nframes);
 
 	int j;
@@ -195,7 +193,7 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
 
   		// Total length of datagram (16 bits): IP header + TCP header
 		// DEBUG : CHANGE THIS CONDITION
-		int len = (j == (nframes-1)) ? leftovers : max_payload;
+		int len = (j == (nframes-1)) ? remainder : max_payload;
 		printf("len : %d\n", len); 
   		iphdr.ip_len = htons (IP4_HDRLEN + TCP_HDRLEN + len); 
 
@@ -342,9 +340,8 @@ int tcp_write(struct tcp_ctrl *tcp_ctrl, void *data, int length) {
  		}
 		tcp_ctrl -> seq += len;
 		if (tcp_ctrl -> state = SYN_SENT) tcp_ctrl -> state = OPEN;
+		rcv_ACK_pck(tcp_ctrl); 
 	}
-
-	// TO DO : Wait for the data to be acknowledged 
 
 	printf("Exiting : tcp_write()\n");
 
@@ -509,6 +506,29 @@ void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
 	
 	tcp_ctrl -> state = SYN_SENT;
 	printf("Exiting : sd_SYN_pck()\n");
+}
+
+void rcv_ACK_pck(struct tcp_ctrl *tcp_ctrl) {
+  
+  printf("Entering : rcv_ACK_pck()\n");
+  
+  int status;
+  struct tcphdr *tcphdr;
+  tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
+  struct ip *ip;
+  ip = (struct ip *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
+  while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x10)) {
+	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
+      		if (errno == EINTR) {
+       			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
+       			continue;  // Something weird happened, but let's try again.
+ 		} else {
+       			perror ("recv() failed:");
+       	 		exit (EXIT_FAILURE);
+     		}
+    	}
+  }
+  printf("Exiting : rcv_ACK_pck()\n");
 }
 
 int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
@@ -696,6 +716,7 @@ void sd_ACK_pck(struct tcp_ctrl *tcp_ctrl, int ack) {
 
 void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
 	
+	printf("Entering : sd_ARP_rq()");
 	int status;
 	arp_hdr arphdr;
 		
@@ -759,6 +780,8 @@ void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
     		perror ("sendto() failed");
    		 exit (EXIT_FAILURE);
   	}	
+	
+	printf("Exiting : sd_ARP_rq()");
 }
 
 void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
@@ -768,6 +791,8 @@ void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
   	//     MAC (6 bytes) + MAC (6 bytes) + ethernet type (2 bytes)
  	//     + ethernet data (ARP header) (28 bytes)
   	// Keep at it until we get an ARP reply.
+
+	printf("Entering : rcv_ARP_asw()");
 
   	int status, i;
   	arp_hdr *arphdr;
@@ -828,7 +853,8 @@ void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
   	printf ("%02x\n", arphdr->target_mac[5]);
   	printf ("Target (this node) protocol (IPv4) address: %u.%u.%u.%u\n",
   	arphdr->target_ip[0], arphdr->target_ip[1], arphdr->target_ip[2], arphdr->target_ip[3]);
-	//printf("Finishing ARP");
+	
+	printf("Entering : rcv_ARP_asw()");
 } 
 	
 // Allocate memory for an array of chars.
