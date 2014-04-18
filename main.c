@@ -6,8 +6,10 @@ int main(int argc, char **argv) {
 	int status;
 
 	uint8_t *rcv_data = (uint8_t *) malloc(RCP_BUFFER*sizeof(uint8_t));  
-	if (rcv_data == NULL) printf("ERROR ALLOCATING RECEPTION BUFFER\n"); 
-	else printf("allocation worked\n");
+	if (rcv_data == NULL) {
+		perror("Error allocating reception buffer\n");
+		exit(EXIT_FAILURE); 
+	}
 
 	struct tcp_ctrl *tcp_ctrl = tcp_new();
 	if ((status = tcp_bind(tcp_ctrl, "209.2.232.216", 52000, "wlan0")) < 0){
@@ -22,12 +24,24 @@ int main(int argc, char **argv) {
 	
 	char *sd_data1 = "GET / HTTP/1.1\r\n\r\n";
 	tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
-	printf("**************** REQUEST COMPLETED ***************\n");
+	printf("**************** FIRST REQUEST COMPLETED ***************\n");
 	
-	tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
-	printf("**************** TRANSMISSION COMPLETED ***************\n");
+	int len = tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
+	printf("**************** FIRST TRANSMISSION COMPLETED ***************\n");
+
+	FILE *f1 = fopen("result1", "ab+");
+	fwrite(rcv_data, 1, len, f1);
+ 	printf("**************** RECORDING FIRST PHASE RESULTS COMPLETED ***************\n");
 	
-	printf("Request : %s\n", (char *) rcv_data); 
+	tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
+	printf("**************** SECOND REQUEST COMPLETED ******************\n");
+	
+	len = tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
+	printf("**************** SECOND TRANSMISSION COMPLETED ***************\n");	
+	
+	FILE *f2 = fopen("result2", "ab+");
+	fwrite(rcv_data, 1, len, f2);
+	printf("**************** RECORDING SECOND PHASE RESULTS COMPLETED ***************\n");
         		
 	free(rcv_data);
 	return 0;

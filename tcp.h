@@ -31,7 +31,7 @@ struct tcp_ctrl{
 	uint8_t *src_mac, *dst_mac, *ether_frame;
 	int *ip_flags, *tcp_flags;
 	struct sockaddr_ll device;
-	int seq, ack;
+	int seq, rcv_ack;
 	uint16_t sport, dport;
 	uint8_t *sdbuffer;
 	int mtu;
@@ -48,7 +48,8 @@ struct tcp_ctrl *tcp_listen(struct tcp_ctrl *);
 void tcp_accept(struct tcp_ctrl *);
 
 // Sending TCP data 
-uint16_t tcp_sndbuf(struct tcp_ctrl *);
 int tcp_write(struct tcp_ctrl *, void *, int);
 
+// Receiving data
+int tcp_rcv(struct tcp_ctrl *, uint8_t *, int);
 

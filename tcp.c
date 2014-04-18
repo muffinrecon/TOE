@@ -334,6 +334,7 @@ int tcp_rcv(struct tcp_ctrl *tcp_ctrl, uint8_t *data, int max_len){
 		     sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack); 
 		}
 	}
+	if (len == max_len) printf("Buffer complet\n");
 	printf("Exiting : tcp_rcv()\n");
 	return len;
 }
