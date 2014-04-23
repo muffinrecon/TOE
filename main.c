@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
 	}
 
 	struct tcp_ctrl *tcp_ctrl = tcp_new();
-	if ((status = tcp_bind(tcp_ctrl, "209.2.232.216", 52000, "wlan0")) < 0){
+	if ((status = tcp_bind(tcp_ctrl, "209.2.232.37", 52000, "wlan0")) < 0){
 		perror("Couldn't bind socket to port\n");
 		exit(EXIT_FAILURE); 
 	} 
@@ -33,15 +33,15 @@ int main(int argc, char **argv) {
 	fwrite(rcv_data, 1, len, f1);
  	printf("**************** RECORDING FIRST PHASE RESULTS COMPLETED ***************\n");
 	
-	tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
-	printf("**************** SECOND REQUEST COMPLETED ******************\n");
+//	tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
+//	printf("**************** SECOND REQUEST COMPLETED ******************\n");
 	
-	len = tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
-	printf("**************** SECOND TRANSMISSION COMPLETED ***************\n");	
+//	len = tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
+//	printf("**************** SECOND TRANSMISSION COMPLETED ***************\n");	
 	
-	FILE *f2 = fopen("result2", "ab+");
-	fwrite(rcv_data, 1, len, f2);
-	printf("**************** RECORDING SECOND PHASE RESULTS COMPLETED ***************\n");
+//	FILE *f2 = fopen("result2", "ab+");
+//	fwrite(rcv_data, 1, len, f2);
+//	printf("**************** RECORDING SECOND PHASE RESULTS COMPLETED ***************\n");
         		
 	free(rcv_data);
 	return 0;

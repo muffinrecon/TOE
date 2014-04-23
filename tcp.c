@@ -151,8 +151,7 @@ int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 	// Modify function synack
 	int ack = rcv_SYNACK_pck(tcp_ctrl);
 	tcp_ctrl -> rcv_ack = ack;
-	printf("ACK value after receiving SYNACK : %d\n", tcp_ctrl -> rcv_ack);
-	// Change ack function;
+	printf("ACK value after receiving SYNACK : %u\n", tcp_ctrl -> rcv_ack);
 	sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack);
 
 	printf("Exiting tcp_connect()\n");
@@ -308,9 +307,7 @@ int tcp_rcv(struct tcp_ctrl *tcp_ctrl, uint8_t *data, int max_len){
 	int bytes, payload;
         	
 	struct tcphdr *tcphdr;
-	tcphdr = (struct tcphdr *) (tcp_ctrl -> ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
-
-	
+	tcphdr = (struct tcphdr *) (tcp_ctrl -> ether_frame + ETH_HDRLEN + IP4_HDRLEN);
 	while ( len < max_len) {
 		if ((bytes = recv(tcp_ctrl -> sd, tcp_ctrl -> ether_frame, IP_MAXPACKET, 0)) < 0) {
 			printf("ERROR");
@@ -318,20 +315,32 @@ int tcp_rcv(struct tcp_ctrl *tcp_ctrl, uint8_t *data, int max_len){
 			exit (EXIT_FAILURE);
 		}
 		else {
-		     payload = bytes - TCP_HDRLEN - IP4_HDRLEN - ETH_HDRLEN;
-		     printf("payload : %d\n", payload);
-		     if( payload < 536 ) {
-		    	memcpy(data + len, (uint8_t *) tcphdr + TCP_HDRLEN, payload); 
-			len += payload;
-			tcp_ctrl -> rcv_ack += (payload);
-			sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack); 		
-			break;
-		     }
-		     memcpy(data + len, (uint8_t *) tcphdr + TCP_HDRLEN, payload); 
-		     printf("len : %d\n", len);
-		     len += payload;
-	             tcp_ctrl -> rcv_ack += payload;
-		     sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack); 
+		     // Filter TCP packets
+		     if ((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl -> ether_frame[13]) == ETH_P_IP) {
+			printf("th_seq : %u\n", ntohl(tcphdr -> th_seq));
+			printf("rcv_ack: %u\n", tcp_ctrl -> rcv_ack);
+		     	if ((ntohl(tcphdr -> th_seq)) == tcp_ctrl -> rcv_ack) {
+		     		payload = bytes - TCP_HDRLEN - IP4_HDRLEN - ETH_HDRLEN;
+		     		printf("payload : %d\n", payload);
+		     		if( payload < 536 ) {
+		    			memcpy(data + len, (uint8_t *) tcphdr + TCP_HDRLEN, payload); 
+					len += payload;
+					tcp_ctrl -> rcv_ack += (payload);
+					sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack);
+					printf("Breaking"); 		
+					break;
+		     		}
+		     		memcpy(data + len, (uint8_t *) tcphdr + TCP_HDRLEN, payload); 
+		     		printf("len : %d\n", len);
+		     		len += payload;
+	             		tcp_ctrl -> rcv_ack += payload;
+		    		sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack);
+		    	}
+		     	else {
+				printf("DROP CONNECTION");
+				break;
+		     	}	 
+		    }
 		}
 	}
 	if (len == max_len) printf("Buffer complet\n");
@@ -544,7 +553,7 @@ int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
     	}
   }
   tcp_ctrl->seq++;
-  return htonl(tcphdr->th_seq) + 1; 	
+  return ntohl(tcphdr->th_seq) + 1; 	
 }
 
 
