@@ -53,3 +53,6 @@ int tcp_write(struct tcp_ctrl *, void *, int);
 // Receiving data
 int tcp_rcv(struct tcp_ctrl *, uint8_t *, int);
 
+// Closing connection
+int tcp_close(struct tcp_ctrl *);
+
