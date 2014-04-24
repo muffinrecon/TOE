@@ -15,7 +15,7 @@ void rcv_ARP_asw(struct tcp_ctrl *);
 void sd_SYN_pck(struct tcp_ctrl *);
 int rcv_SYNACK_pck(struct tcp_ctrl *);
 int rcv_ACK_pck(struct tcp_ctrl *);
-int send_FINACK_pck(struct tcp_ctrl *);
+int sd_FINACK_pck(struct tcp_ctrl *);
 int rcv_FINACK_pck(struct tcp_ctrl *);
 void sd_ACK_pck(struct tcp_ctrl *, int);
 
@@ -164,6 +164,11 @@ int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 int tcp_close(struct tcp_ctrl *tcp_ctrl) {
 	sd_FINACK_pck(tcp_ctrl);
 	rcv_FINACK_pck(tcp_ctrl);
+	sd_FINACK_pck(tcp_ctrl);
+	tcp_ctrl->seq++;
+	tcp_ctrl->rcv_ack++;
+	sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack);
+	rcv_ACK_pck(tcp_ctrl);
 	sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack);
 	return 0;
 } 
@@ -427,16 +432,16 @@ int sd_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
   	int tcp_flags[8];
 
   	// Source port number (16 bits)
-  	tcphdr.th_sport = htons (tcp_ctrl->sport); 
+  	tcphdr.th_sport = htons (tcp_ctrl -> sport); 
 
  	// Destination port number (16 bits)
-  	tcphdr.th_dport = htons (tcp_ctrl->dport);
+  	tcphdr.th_dport = htons (tcp_ctrl -> dport);
 
   	// Sequence number (32 bits)
-  	tcphdr.th_seq = htonl (tcp_ctrl->seq); 
+  	tcphdr.th_seq = htonl (tcp_ctrl -> seq); 
 
   	// Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
-  	tcphdr.th_ack = htonl (tcp_ctrl->rcv_ack);
+  	tcphdr.th_ack = htonl (tcp_ctrl -> rcv_ack);
 
   	// Reserved (4 bits): should be 0
   	tcphdr.th_x2 = 0;
@@ -519,7 +524,7 @@ int sd_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
 void sd_SYN_pck(struct tcp_ctrl *tcp_ctrl) {
 
 	printf("Entering : sd_SYN_pck()\n");
-	
+
   	int status, i, frame_length, bytes;
 
   	//IPV4 header
@@ -685,7 +690,7 @@ int rcv_ACK_pck(struct tcp_ctrl *tcp_ctrl) {
   tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
   struct ip *ip;
   ip = (struct ip *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
-  while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x10)) {
+  do {
 	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
       		if (errno == EINTR) {
        			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
@@ -695,7 +700,7 @@ int rcv_ACK_pck(struct tcp_ctrl *tcp_ctrl) {
        	 		exit (EXIT_FAILURE);
      		}
     	}
-  }
+  } while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x10));
   printf("Exiting : rcv_ACK_pck()\n");
   return tcp_ctrl -> rcv_ack + status;
 }
@@ -706,21 +711,26 @@ int rcv_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
   
   int status;
   struct tcphdr *tcphdr;
-  tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame + 6 + 6 + 2 + IP4_HDRLEN);
+  tcphdr= (struct tcphdr *) (tcp_ctrl -> ether_frame + ETH_HDRLEN + IP4_HDRLEN);
   struct ip *ip;
   ip = (struct ip *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
-  while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x11)) {
+  do {
 	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
       		if (errno == EINTR) {
        			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
-       			continue;  // Something weird happened, but let's try again.
+       			continue;  // something weird happened, but let's try again.
  		} else {
        			perror ("recv() failed:");
        	 		exit (EXIT_FAILURE);
      		}
     	}
+
   }
-  return 0; 	
+  while (((((tcp_ctrl -> ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x11)); 
+ 
+  printf("Exiting : rcv_FINACK_pck()\n");
+  return 0; 
+  	
 }
 
 int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
@@ -824,8 +834,7 @@ void sd_ACK_pck(struct tcp_ctrl *tcp_ctrl, int ack) {
   tcphdr.th_seq= htonl(tcp_ctrl->seq);
 
   // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
-  tcphdr.th_ack =htonl(ack);  
-  //tcphdr.th_ack =htonl(1 + ntohl(ack));  
+  tcphdr.th_ack =htonl(tcp_ctrl->rcv_ack);  
 
   // Reserved (4 bits): should be 0
   tcphdr.th_x2 = 0;
@@ -901,8 +910,7 @@ void sd_ACK_pck(struct tcp_ctrl *tcp_ctrl, int ack) {
   if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
-  }
-	
+  }	
 }
 
 void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
