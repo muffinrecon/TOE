@@ -1,5 +1,6 @@
 #include "tcp.h"
 #include "arp.h"
+#include <string.h>
 
 #define SYN 0x02
 #define ACK 0x10
@@ -30,8 +31,8 @@ int rcv_FINACK_pck(struct tcp_ctrl *);
 void sd_ACK_pck(struct tcp_ctrl *, int);
 
 struct tcp_ctrl *tcp_new (void) {
-	// printf("Entering : tcp_new()\n");
-	
+	//printf("Entering : tcp_new()\n");
+	printf("ETH_HDRLEN : %d\n", ETH_HDRLEN); 
 	struct tcp_ctrl *tcp_ctrl = malloc(sizeof(struct tcp_ctrl));
 	if (tcp_ctrl == NULL) {
 		perror("malloc() failed");
@@ -164,7 +165,7 @@ int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 	
 	// Fill out sockaddr_ll.
 	(tcp_ctrl->device).sll_family = AF_PACKET;
-	memcpy ((tcp_ctrl->device).sll_addr, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
+	memcpy ((tcp_ctrl->device).sll_addr, tcp_ctrl -> src_mac, 6 * sizeof (uint8_t));
 	(tcp_ctrl->device).sll_halen = htons(6);	
 	
 	sd_ARP_rq(tcp_ctrl);
@@ -311,13 +312,13 @@ fill_iphdr(struct tcp_ctrl *tcp_ctrl, int len) {
   	iphdr -> ip_p = IPPROTO_TCP;
 
   	// Source IPv4 address (32 bits)
-  	if ((status = inet_pton (AF_INET,tcp_ctrl->src_ip, &(iphdr -> ip_src))) != 1) {
+  	if ((status = inet_pton (AF_INET, tcp_ctrl -> src_ip, &(iphdr -> ip_src))) != 1) {
     		fprintf (stderr, "inet_pton() failed 1.\nError message: %s", strerror (status));
     		exit (EXIT_FAILURE);
  	}
 	// Destination IPv4 address (32 bits)
-  	if ((status = inet_pton (AF_INET, tcp_ctrl->dst_ip, &(iphdr -> ip_dst))) != 1) {
-    		fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
+  	if ((status = inet_pton (AF_INET, tcp_ctrl -> dst_ip, &(iphdr -> ip_dst))) != 1) {
+   		fprintf (stderr, "inet_pton() failed 2.\nError message: %s", strerror (status));
     		exit (EXIT_FAILURE);
  	 }
 	// IPv4 header checksum (16 bits): set to 0 when calculating checksum
@@ -376,7 +377,6 @@ int fill_ethhdr(struct tcp_ctrl *tcp_ctrl, int len) {
 	// TCP header
   	memcpy (tcp_ctrl -> ether_frame + ETH_HDRLEN + IP4_HDRLEN, tcp_ctrl -> tcphdr, TCP_HDRLEN * sizeof (uint8_t));
 	memcpy (tcp_ctrl -> ether_frame + ETH_HDRLEN + IP4_HDRLEN + TCP_HDRLEN, tcp_ctrl-> sdbuffer, len * sizeof(uint8_t));
-	
 
 }
 int sd_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
@@ -391,7 +391,7 @@ int sd_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
 
 
   	// Send ethernet frame to socket.
-  	frame_length = 6 + 6 + 2 + IP4_HDRLEN + TCP_HDRLEN;
+  	frame_length = ETH_HDRLEN + IP4_HDRLEN + TCP_HDRLEN;
   	if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     		perror ("sendto() failed");
     		exit (EXIT_FAILURE);
@@ -440,7 +440,11 @@ int rcv_ACK_pck(struct tcp_ctrl *tcp_ctrl) {
        	 		exit (EXIT_FAILURE);
      		}
     	}
-  } while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x10));
+  } while (((((tcp_ctrl -> ether_frame[12]) << 8) + tcp_ctrl -> ether_frame[13]) != ETH_P_IP)
+	||(strcmp(inet_ntoa(ip -> ip_src), tcp_ctrl -> dst_ip) != 0)
+	||(strcmp(inet_ntoa(ip -> ip_dst), tcp_ctrl -> src_ip) != 0) // Maybe we can remove this condition 
+	||(memcmp(tcp_ctrl -> ether_frame, tcp_ctrl -> src_mac, 6) != 0)   // In case we have several MAC (possible ?)
+	||(tcphdr->th_flags != ACK));
   printf("Exiting : rcv_ACK_pck()\n");
   return tcp_ctrl -> rcv_ack + status;
 }
@@ -453,7 +457,7 @@ int rcv_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
   struct tcphdr *tcphdr;
   tcphdr= (struct tcphdr *) (tcp_ctrl -> ether_frame + ETH_HDRLEN + IP4_HDRLEN);
   struct ip *ip;
-  ip = (struct ip *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
+  ip = (struct ip *) (tcp_ctrl->ether_frame + ETH_HDRLEN);
   do {
 	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
       		if (errno == EINTR) {
@@ -466,7 +470,11 @@ int rcv_FINACK_pck(struct tcp_ctrl *tcp_ctrl) {
     	}
 
   }
-  while (((((tcp_ctrl -> ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x11)); 
+  while (((((tcp_ctrl -> ether_frame[12]) << 8) + tcp_ctrl -> ether_frame[13]) != ETH_P_IP)
+	||(strcmp(inet_ntoa(ip -> ip_src), tcp_ctrl -> dst_ip) != 0)
+	||(strcmp(inet_ntoa(ip->ip_dst), tcp_ctrl -> src_ip) != 0) // Maybe we can remove this condition 
+	||(memcmp(tcp_ctrl -> ether_frame, tcp_ctrl -> src_mac, 6) != 0)   // In case we have several MAC (possible ?)
+	||(tcphdr->th_flags != FINACK)); 
  
   printf("Exiting : rcv_FINACK_pck()\n");
   return 0; 
@@ -479,11 +487,16 @@ int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
   
   int status;
   struct tcphdr *tcphdr;
-  tcphdr= (struct tcphdr *) (tcp_ctrl->ether_frame + ETH_HDRLEN + IP4_HDRLEN);
+  tcphdr= (struct tcphdr *) (tcp_ctrl -> ether_frame + ETH_HDRLEN + IP4_HDRLEN);
   struct ip *ip;
-  ip = (struct ip *) (tcp_ctrl->ether_frame + ETH_HDRLEN);
-  while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)||(*(inet_ntoa(ip->ip_src)) != *(tcp_ctrl->dst_ip))||(tcphdr->th_flags != 0x12)) {
-	if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
+  ip = (struct ip *) (tcp_ctrl -> ether_frame + ETH_HDRLEN);
+  while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)
+	||(strcmp(inet_ntoa(ip->ip_src), tcp_ctrl -> dst_ip) != 0)
+	//||(strcmp(inet_ntoa(ip->ip_dst), tcp_ctrl -> src_ip) != 0) // In case we have several IP on the same machine
+	||(memcmp(tcp_ctrl -> ether_frame, tcp_ctrl -> src_mac, 6) != 0)   // In case we have several MAC (possible ?)
+	||(tcphdr -> th_flags != SYNACK)) {
+ 
+	if ((status = recv (tcp_ctrl->sd, tcp_ctrl -> ether_frame, IP_MAXPACKET, 0)) < 0) {
       		if (errno == EINTR) {
        			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));
        			continue;  // Something weird happened, but let's try again.
@@ -508,7 +521,7 @@ void sd_ACK_pck(struct tcp_ctrl *tcp_ctrl, int ack) {
   
   // Send ethernet frame to socket.
   frame_length = ETH_HDRLEN + IP4_HDRLEN + TCP_HDRLEN; 
-  if ((bytes = sendto (tcp_ctrl->sd, tcp_ctrl->ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
+  if ((bytes = sendto (tcp_ctrl -> sd, tcp_ctrl -> ether_frame, frame_length, 0, (struct sockaddr *) &(tcp_ctrl->device), sizeof (struct sockaddr_ll))) <= 0) {
     perror ("sendto() failed");
     exit (EXIT_FAILURE);
   }	
@@ -537,7 +550,7 @@ void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
   	arphdr.plen = 4;
 
   	// OpCode: 1 for ARP request
- 	 arphdr.opcode = htons (ARPOP_REQUEST);
+ 	arphdr.opcode = htons (ARPOP_REQUEST);
 
   	// Sender hardware address (48 bits): MAC address
   	memcpy (arphdr.sender_mac, tcp_ctrl->src_mac, 6 * sizeof (uint8_t));
@@ -559,7 +572,7 @@ void sd_ARP_rq(struct tcp_ctrl *tcp_ctrl) {
 	int frame_length, bytes;
 	
   	// Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (ARP header)
-  	frame_length = 6 + 6 + 2 + ARP_HDRLEN;
+  	frame_length = ETH_HDRLEN+ ARP_HDRLEN;
 
   	// Destination and Source MAC addresses
  	memcpy (tcp_ctrl->ether_frame, tcp_ctrl->dst_mac, 6 * sizeof (uint8_t));
@@ -597,9 +610,9 @@ void rcv_ARP_asw(struct tcp_ctrl* tcp_ctrl) {
   	int status, i;
   	arp_hdr *arphdr;
 
-  	arphdr = (arp_hdr *) (tcp_ctrl->ether_frame + 6 + 6 + 2);
+  	arphdr = (arp_hdr *) (tcp_ctrl->ether_frame + ETH_HDRLEN);
 
- 	while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_ARP) || (ntohs (arphdr->opcode) != ARPOP_REPLY)) {
+ 	while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_ARP) || (ntohs(arphdr -> opcode) != ARPOP_REPLY)) {
     		if ((status = recv (tcp_ctrl->sd, tcp_ctrl->ether_frame, IP_MAXPACKET, 0)) < 0) {
       			if (errno == EINTR) {
         			memset (tcp_ctrl->ether_frame, 0, IP_MAXPACKET * sizeof (uint8_t));

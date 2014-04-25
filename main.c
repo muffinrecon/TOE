@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
 	}
 
 	struct tcp_ctrl *tcp_ctrl = tcp_new();
-	if ((status = tcp_bind(tcp_ctrl, "209.2.233.82", 52000, "wlan0")) < 0){
+	if ((status = tcp_bind(tcp_ctrl, "209.2.233.44", 52000, "wlan0")) < 0){
 		perror("Couldn't bind socket to port\n");
 		exit(EXIT_FAILURE); 
 	} 
