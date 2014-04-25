@@ -31,8 +31,8 @@ int rcv_FINACK_pck(struct tcp_ctrl *);
 void sd_ACK_pck(struct tcp_ctrl *, int);
 
 struct tcp_ctrl *tcp_new (void) {
-	//printf("Entering : tcp_new()\n");
-	printf("ETH_HDRLEN : %d\n", ETH_HDRLEN); 
+	printf("Entering : tcp_new()\n");
+	
 	struct tcp_ctrl *tcp_ctrl = malloc(sizeof(struct tcp_ctrl));
 	if (tcp_ctrl == NULL) {
 		perror("malloc() failed");
@@ -159,7 +159,8 @@ int tcp_connect(struct tcp_ctrl *tcp_ctrl, char* url) {
 	}
 	ipv4 = (struct sockaddr_in *) res->ai_addr;
 	tmp = &(ipv4 -> sin_addr);
-	tcp_ctrl->dst_ip = inet_ntoa(ipv4->sin_addr);
+	
+	strcpy(tcp_ctrl -> dst_ip, inet_ntoa(ipv4->sin_addr));
 	
 	freeaddrinfo(res);
 	
@@ -492,7 +493,7 @@ int rcv_SYNACK_pck(struct tcp_ctrl *tcp_ctrl) {
   ip = (struct ip *) (tcp_ctrl -> ether_frame + ETH_HDRLEN);
   while (((((tcp_ctrl->ether_frame[12]) << 8) + tcp_ctrl->ether_frame[13]) != ETH_P_IP)
 	||(strcmp(inet_ntoa(ip->ip_src), tcp_ctrl -> dst_ip) != 0)
-	//||(strcmp(inet_ntoa(ip->ip_dst), tcp_ctrl -> src_ip) != 0) // In case we have several IP on the same machine
+	||(strcmp(inet_ntoa(ip->ip_dst), tcp_ctrl -> src_ip) != 0) // In case we have several IP on the same machine
 	||(memcmp(tcp_ctrl -> ether_frame, tcp_ctrl -> src_mac, 6) != 0)   // In case we have several MAC (possible ?)
 	||(tcphdr -> th_flags != SYNACK)) {
  
