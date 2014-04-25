@@ -34,6 +34,8 @@ struct tcp_ctrl{
 	int seq, rcv_ack;
 	uint16_t sport, dport;
 	uint8_t *sdbuffer;
+  	struct tcphdr *tcphdr;
+	struct ip *iphdr;	
 	int mtu;
 	state_t state; 
 };

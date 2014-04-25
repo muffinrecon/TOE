@@ -1,6 +1,6 @@
 #include "tcp.h"
 
-#define RCP_BUFFER 100000
+#define RCP_BUFFER 1000000
 
 int main(int argc, char **argv) {
 	int status;
@@ -22,18 +22,19 @@ int main(int argc, char **argv) {
 	}
 	printf("**************** HANDSHAKE COMPLETED ***********************\n");
 
-	tcp_close(tcp_ctrl);	
-	//char *sd_data1 = "GET / HTTP/1.1\r\n\r\n";
-	//tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
-	//printf("**************** FIRST REQUEST COMPLETED ***************\n");
+	char *sd_data1 = "GET / HTTP/1.1\r\n\r\n";
+	tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
+	printf("**************** FIRST REQUEST COMPLETED ***************\n");
 	
-	//int len = tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
-	//printf("**************** FIRST TRANSMISSION COMPLETED ***************\n");
+	int len = tcp_rcv(tcp_ctrl, rcv_data, RCP_BUFFER);
+	printf("**************** FIRST TRANSMISSION COMPLETED ***************\n");
 
-	//FILE *f1 = fopen("result1", "ab+");
-	//fwrite(rcv_data, 1, len, f1);
- 	//printf("**************** RECORDING FIRST PHASE RESULTS COMPLETED ***************\n");
+	FILE *f1 = fopen("result1", "ab+");
+	fwrite(rcv_data, 1, len, f1);
+ 	printf("**************** RECORDING FIRST PHASE RESULTS COMPLETED ***************\n");
 	
+	tcp_close(tcp_ctrl);	
+
 //	tcp_write(tcp_ctrl, sd_data1, strlen(sd_data1));
 //	printf("**************** SECOND REQUEST COMPLETED ******************\n");
 	
