@@ -4,6 +4,7 @@
 
 int main(int argc, char **argv) {
 	int status;
+	tcp_set_rawsck();
 
 	uint8_t *rcv_data = (uint8_t *) malloc(RCP_BUFFER*sizeof(uint8_t));  
 	if (rcv_data == NULL) {
