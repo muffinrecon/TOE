@@ -264,8 +264,8 @@ int tcp_rcv_rawsck(struct tcp_ctrl *tcp_ctrl, uint8_t *data, int max_len){
 		    		sd_ACK_pck(tcp_ctrl, tcp_ctrl -> rcv_ack);
 		    	}
 		     	else {
-				printf("DROP CONNECTION");
-				break;
+				printf("DROP CONNECTION\n");
+				return -1;
 		     	}	 
 		    }
 		}
