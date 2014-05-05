@@ -24,7 +24,7 @@ module RAM_searcher (input logic rs_clk,
     reg not_found;
     wire [144:0] data_out;
     reg [144:0] data_in;
-     logic delete;
+    logic delete;
     RAM RAM_Storage (.address (addr), .clock (clk), .data(data_in), .wren(wren), .q(data_out));
     
     always_ff @ (posedge clk)
@@ -45,7 +45,7 @@ module RAM_searcher (input logic rs_clk,
                 addr <= 8'b0;
                 rs_id_out <= 8'b0;
                 rs_done <= 1'b0;
-                     delete <= 1'b0;
+                delete <= 1'b0;
             end
         //check if there is a connection
         else if(rs_rq == 2'b01)//assuming rs_rq==1 means reqest to initialize a new connection
@@ -79,7 +79,7 @@ module RAM_searcher (input logic rs_clk,
                     counter <= counter + 1'b1; //counter ++;
                     rs_id_out <= counter; //return ID as counter
                     rs_error <= 7'b11; //no exsiting connection
-                          addr = counter;//RAM address as ID
+                    addr = counter;//RAM address as ID
                     //not_found <= 1'b0; //reset not_found to false
                 end
             end
