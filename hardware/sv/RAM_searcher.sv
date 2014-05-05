@@ -71,18 +71,6 @@ module RAM_searcher (input logic rs_clk,
                 end
                 addr = rs_id_out;//not sure of this
           end
-             //after looping through RAM
-          //not found exisiting connection
-          //#80ns;//wait the for loop to be done
-          else if (rs_rq == 2'b01 && not_found)
-                begin
-                    wren <= 1'b1; //enable wren
-                    counter <= counter + 1'b1; //counter ++;
-                    rs_id_out <= counter; //return ID as counter
-                    rs_error <= 7'b 0000010; //no exsiting connection
-                    addr = counter;//RAM address as ID
-                    //not_found <= 1'b0; //reset not_found to false
-                end
           else if (rs_rq == 2'b10)//assuming rs_rq==10 means reqest to delete a new connection
                 begin
                     addr = rs_id_in;
@@ -90,6 +78,18 @@ module RAM_searcher (input logic rs_clk,
                     wren <= 1'b1;
                     data_in <= data_out;
                     data_in[0] <= 1'b0; //valid bit
+                end
+          //after looping through RAM
+          //not found exisiting connection
+          //#80ns;//wait the for loop to be done
+         if (rs_rq == 2'b01 && not_found)
+                begin
+                    wren <= 1'b1; //enable wren
+                    counter <= counter + 1'b1; //counter ++;
+                    rs_id_out <= counter; //return ID as counter
+                    rs_error <= 7'b 0000010; //no exsiting connection
+                    addr = counter;//RAM address as ID
+                    //not_found <= 1'b0; //reset not_found to false
                 end
         //write to RAM,
           if (wren && delete)
