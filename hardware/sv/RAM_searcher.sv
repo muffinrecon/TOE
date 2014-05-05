@@ -100,7 +100,7 @@ module RAM_searcher (input logic rs_clk,
                 end
         else if(wren)
             begin
-            	wren <= 1b'0;
+            	wren <= 1'b0;
                 rs_done <= 1'b1; //done
             end
         end
