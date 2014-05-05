@@ -1,21 +1,21 @@
-//Note: before setting rs_rq == 1, meaning initialzing a new connection, input data rs_ip_src etc.. has to be set for at least 2 clock 
+//Note: before setting rs_rq == 1, meaning initialzing a new connection, input data rs_ip_src etc.. has to be set for at least 2 clock
 //cycles in advacne. This was tested in ModelSim to make sure correct timing.
 
 //deletion of a connection not done yet
 
 module RAM_searcher (input logic rs_clk,
-			input logic rs_rst,
-			input logic [1:0] rs_rq,
-			input logic [7:0] rs_id_in,
-			input logic [31:0] rs_ip_src,
-			input logic [31:0] rs_ip_dst,
-			input logic [23:0] rs_mac_src,
-			input logic [23:0] rs_mac_dst,
-			input logic [15:0] rs_port_src,
-			input logic [15:0] rs_port_dst,
-			output logic [7:0]    rs_error,
-			output logic rs_done,
-			output logic [7:0]    rs_id_out);
+		input logic rs_rst,
+		input logic [1:0] rs_rq,
+		input logic [7:0] rs_id_in,
+		input logic [31:0] rs_ip_src,
+		input logic [31:0] rs_ip_dst,
+		input logic [23:0] rs_mac_src,
+		input logic [23:0] rs_mac_dst,
+		input logic [15:0] rs_port_src,
+		input logic [15:0] rs_port_dst,
+		output logic [7:0] rs_error,
+		output logic rs_done,
+		output logic [7:0] rs_id_out);
 
 //To be implemented by Qi
     reg [6:0] counter;
@@ -70,10 +70,11 @@ module RAM_searcher (input logic rs_clk,
                           //end
                 end
                 addr = rs_id_out;//not sure of this
-                //after looping through RAM
-                //not found exisiting connection
-                #80ns;//wait the for loop to be done
-                if (not_found)
+          end
+             //after looping through RAM
+          //not found exisiting connection
+          //#80ns;//wait the for loop to be done
+          else if (rs_rq == 2'b01 && not_found)
                 begin
                     wren <= 1'b1; //enable wren
                     counter <= counter + 1'b1; //counter ++;
@@ -82,7 +83,6 @@ module RAM_searcher (input logic rs_clk,
                     addr = counter;//RAM address as ID
                     //not_found <= 1'b0; //reset not_found to false
                 end
-            end
           else if (rs_rq == 2'b10)//assuming rs_rq==10 means reqest to delete a new connection
                 begin
                     addr = rs_id_in;
@@ -100,7 +100,7 @@ module RAM_searcher (input logic rs_clk,
                 end
         else if(wren)
             begin
-            	wren <= 1'b0;
+             wren <= 1'b0;
                 rs_done <= 1'b1; //done
             end
         end
