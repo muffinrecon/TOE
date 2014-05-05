@@ -15,7 +15,7 @@ module RAM_searcher (input logic 		rs_clk,
 //To be implemented by Qi
     reg [6:0] counter;
     reg wren;
-    reg [11:0] addr;
+    reg [7:0] addr;
     reg not_found;
     wire [144:0] data_out;
     reg [144:0] data_in;
@@ -31,17 +31,18 @@ module RAM_searcher (input logic 		rs_clk,
         data_in[32:17] <= rs_port_src;
         data_in[16:1] <= rs_port_dst;
         data_in[0] <= 1'b1; //valid bit
-        if (rs_rst)
+        if (rs_rst) // reset signals
             begin
                 counter <= 7'b0; 
                 not_found <= 1'b1;
                 wren <= 1'b0;
-                addr <= 12'b0;
+                addr <= 8'b0;
                 con_existed <= 1'b0;
                 rs_id_out <= 8'b0;
+                rs_done <= 1'b0;
             end
         //check if there is a connection
-        else if(rs_rq)
+        else if(rs_rq == 2'b1)//assuming rs_rq==1 means reqest to initialize a new connection
             begin
                 //go through the RAM.
                 //setting loop to max of 250, there will be error with more than 250
@@ -52,12 +53,13 @@ module RAM_searcher (input logic 		rs_clk,
                     if (data_out == data_in)
                     begin
                         wren <= 1'b0; //disable wren
-                        ID <= addr -1 ; // assign ID as addr
+                        rs_id_out <= addr -1 ; // assign ID as addr
                         not_found <= 1'b0; //set not_found to false
-                        con_existed <= 1'b1; //there is an exsiting connection
+                        rs_error <= 7'b1; //there is an exsiting connection
+                        rs_done <= 1b'1; //done
                     end
                 end
-                addr = ID;//not sure of this
+                addr = rs_id_out;//not sure of this
                 //after looping through RAM
                 //not found exisiting connection
                 #80ns;//wait the for loop to be done
@@ -65,15 +67,16 @@ module RAM_searcher (input logic 		rs_clk,
                 begin
                     wren <= 1'b1; //enable wren
                     counter <= counter + 1'b1; //counter ++;
-                    ID <= counter; //return ID as counter
-                    con_existed <= 1'b0; //no exsiting connection
+                    rs_id_out <= counter; //return ID as counter
+                    rs_error <= 7'b11; //no exsiting connection
                     //not_found <= 1'b0; //reset not_found to false
                 end
             end
         //write to RAM,
         if(wren)
             begin
-                addr = ID;//RAM address as ID
+                addr = rs_id_out;//RAM address as ID
+                rs_done <= 1b'1; //done
             end
         end
     
