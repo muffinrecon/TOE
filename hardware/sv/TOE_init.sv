@@ -78,7 +78,7 @@ module TOE_init( input logic		clk,
 					case (address)
 		  	   	    	   4'h0 : readdata[1:0]  <= req_code;
 		  	   	    	   4'h1 : readdata[0]    <= done;
-		  	   	    	   4'h2 : readdata[3:0]  <= error;    
+		  	   	    	   4'h2 : readdata[7:0]  <= error;    
 		  	   	    	   4'h3 : readdata       <= ip_src;
 		  	   	    	   4'h4 : readdata       <= ip_dst;
 		  	   	    	   4'h5 : readdata[23:0] <= mac_src;
