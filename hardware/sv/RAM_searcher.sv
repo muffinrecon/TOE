@@ -27,7 +27,7 @@ module RAM_searcher (input logic rs_clk,
     logic delete;
     RAM RAM_Storage (.address (addr), .clock (clk), .data(data_in), .wren(wren), .q(data_out));
     
-    always_ff @ (posedge clk)
+    always_ff @ (posedge rs_clk)
         begin
         //store the data into data_in
         data_in[144:121] <= rs_mac_src;
@@ -42,8 +42,8 @@ module RAM_searcher (input logic rs_clk,
                 counter <= 7'b0;
                 not_found <= 1'b1;
                 wren <= 1'b0;
-                addr <= 8'b0;
-                rs_id_out <= 8'b0;
+                addr  = 8'b0; 
+                rs_id_out <= 8'b0; 
                 rs_done <= 1'b0;
                 delete <= 1'b0;
             end
