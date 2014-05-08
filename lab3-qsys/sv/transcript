@@ -1,0 +1,17 @@
+# //  ModelSim SE 5.8e Aug 28 2004 Linux 2.6.18-371.el5
+# //
+# //  Copyright Model Technology, a Mentor Graphics Corporation company, 2004
+# //                         All Rights Reserved.
+# //                   UNPUBLISHED, LICENSED SOFTWARE.
+# //         CONFIDENTIAL AND PROPRIETARY INFORMATION WHICH IS THE
+# //        PROPERTY OF MENTOR GRAPHICS CORPORATION OR ITS LICENSORS.
+# //
+# Project file /home/user2/spring14/cb3022/TOE/lab3-qsys/test/TOE_Test.mpf was not found.
+# Unable to open project.
+project open /home/user2/spring14/cb3022/TOE/lab3-qsys/test/TOE_Test
+# Project file /home/user2/spring14/cb3022/TOE/lab3-qsys/test/TOE_Test.mpf was not found.
+# Unable to open project.
+project open /home/user2/spring14/cb3022/TOE/lab3-qsys/test1/TOE_Test.mpf
+# Loading project TOE_Test
+# 0 compiles, 3 failed with no errors. 
+# reading /work/tools3/modeltech/linux/../modelsim.ini
