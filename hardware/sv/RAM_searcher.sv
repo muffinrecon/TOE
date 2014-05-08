@@ -1,7 +1,7 @@
 //Note: before setting rs_rq == 1, meaning initialzing a new connection, input data rs_ip_src etc.. has to be set for at least 2 clock
 //cycles in advacne. This was tested in ModelSim to make sure correct timing.
 
-//deletion of a connection not done yet
+//
 
 module RAM_searcher (input logic rs_clk,
 		input logic rs_rst,
