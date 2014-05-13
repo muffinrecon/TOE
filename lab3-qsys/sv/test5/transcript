@@ -1,0 +1,122 @@
+# Loading project test5
+# Compile of RAM.v was successful.
+# Compile of RAM_searcher.sv was successful.
+# Compile of testbench_TOE_init.sv was successful.
+# Compile of TOE_init.sv was successful.
+# 4 compiles, 0 failed with no errors. 
+vsim -L altera_mf_ver work.testbench
+# vsim -L altera_mf_ver work.testbench 
+# Loading sv_std.std
+# Loading work.testbench
+# Loading work.TOE_init
+# Loading work.RAM_searcher
+# Loading work.RAM
+# Loading altera_mf_ver.altsyncram
+# Loading altera_mf_ver.ALTERA_DEVICE_FAMILIES
+# Loading altera_mf_ver.ALTERA_MF_MEMORY_INITIALIZATION
+# ** Error: (vsim-3063) /home/user2/spring14/cb3022/TOE/TOE/lab3-qsys/sv/test5/TOE_init.sv(38): Port 'ip_src' not found in the connected module (3rd connection).
+#         Region: /testbench/t0/rs0
+# ** Error: (vsim-3063) /home/user2/spring14/cb3022/TOE/TOE/lab3-qsys/sv/test5/TOE_init.sv(38): Port 'ip_dst' not found in the connected module (4th connection).
+#         Region: /testbench/t0/rs0
+# ** Error: (vsim-3063) /home/user2/spring14/cb3022/TOE/TOE/lab3-qsys/sv/test5/TOE_init.sv(38): Port 'mac_src' not found in the connected module (5th connection).
+#         Region: /testbench/t0/rs0
+# ** Error: (vsim-3063) /home/user2/spring14/cb3022/TOE/TOE/lab3-qsys/sv/test5/TOE_init.sv(38): Port 'mac_dst' not found in the connected module (6th connection).
+#         Region: /testbench/t0/rs0
+# ** Error: (vsim-3063) /home/user2/spring14/cb3022/TOE/TOE/lab3-qsys/sv/test5/TOE_init.sv(38): Port 'port_src' not found in the connected module (7th connection).
+#         Region: /testbench/t0/rs0
+# ** Error: (vsim-3063) /home/user2/spring14/cb3022/TOE/TOE/lab3-qsys/sv/test5/TOE_init.sv(38): Port 'port_dst' not found in the connected module (8th connection).
+#         Region: /testbench/t0/rs0
+# Error loading design
+# Compile of RAM.v was successful.
+# Compile of RAM_searcher.sv was successful.
+# Compile of testbench_TOE_init.sv was successful.
+# Compile of TOE_init.sv was successful.
+# 4 compiles, 0 failed with no errors. 
+vsim -L altera_mf_ver work.testbench
+# vsim -L altera_mf_ver work.testbench 
+# Loading sv_std.std
+# Loading work.testbench
+# Loading work.TOE_init
+# Loading work.RAM_searcher
+# Loading work.RAM
+# Loading altera_mf_ver.altsyncram
+# Loading altera_mf_ver.ALTERA_DEVICE_FAMILIES
+# Loading altera_mf_ver.ALTERA_MF_MEMORY_INITIALIZATION
+add wave -r sim:/testbench/t0/*
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+run
+# Can't move the Now cursor.
+# Can't move the Now cursor.
+# Break key hit 
