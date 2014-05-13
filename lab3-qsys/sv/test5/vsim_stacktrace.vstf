@@ -1,0 +1,39 @@
+# Current time Mon May 12 20:28:25 2014
+# ModelSim Stack Trace
+# Program = vsim
+# Id = "10.1d"
+# Version = "2012.11"
+# Date = "Nov  2 2012"
+# Platform = linuxpe
+# 0    0xffffe410: '<unknown (@0xffffe410)>'
+# 1    0x0049773c: 'abort + 0xfc' in '/lib/libc.so.6'
+# 2    0x0048f286: '_assert_fail + 0xf6' in '/lib/libc.so.6'
+# 3    0x083c553e: '<unknown (@0x83c553e)>'
+# 4    0x083c7ea0: '<unknown (@0x83c7ea0)>'
+# 5    0x08061dc6: '<unknown (@0x8061dc6)>'
+# End of Stack Trace
+
+
+# Current time Mon May 12 20:28:25 2014
+# ModelSim Stack Trace
+# Program = vsim
+# Id = "10.1d"
+# Version = "2012.11"
+# Date = "Nov  2 2012"
+# Platform = linuxpe
+# 0    0xffffe410: '<unknown (@0xffffe410)>'
+# 1    0x0049773c: 'abort + 0xfc' in '/lib/libc.so.6'
+# 2    0x0048f286: '_assert_fail + 0xf6' in '/lib/libc.so.6'
+# 3    0x083c5631: '<unknown (@0x83c5631)>'
+# 4    0x00498f04: 'exit + 0xe4' in '/lib/libc.so.6'
+# 5    0x083c5a32: '<unknown (@0x83c5a32)>'
+# 6    0x083c8858: '<unknown (@0x83c8858)>'
+# 7    0xffffe5fb: '<unknown (@0xffffe5fb)>'
+# 8    0x0049773c: 'abort + 0xfc' in '/lib/libc.so.6'
+# 9    0x0048f286: '_assert_fail + 0xf6' in '/lib/libc.so.6'
+# 10   0x083c553e: '<unknown (@0x83c553e)>'
+# 11   0x083c7ea0: '<unknown (@0x83c7ea0)>'
+# 12   0x08061dc6: '<unknown (@0x8061dc6)>'
+# End of Stack Trace
+
+
