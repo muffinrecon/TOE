@@ -14,7 +14,7 @@ module Packet_builder( input logic [8:0] addr,
 	logic [8:0] empty;
 
 	logic [475:0] packet; /*Need to add on payload still..*/
-	logic [287:0] RAM_stored_header_data; /*stores the 32 (32x8 bits) bytes of 1 record*/
+	logic [287:0] RAM_stored_header_data; /*stores the 32 (32x9 bits) bytes of 1 record*/
 	
 	logic last_record;
 	assign last_record =  (base_addr == 8'd224); 
@@ -110,6 +110,7 @@ always_ff @ (posedge clk)
 						    continue_three: 
 								begin
 									RAM_stored_header_data[191:160] <= ram_out[31:0];  /*ip_src*/
+									current_state <= continue_four;
 								end
 							 continue_four: 
 								begin
