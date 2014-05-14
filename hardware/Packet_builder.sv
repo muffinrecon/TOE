@@ -1,6 +1,6 @@
 /*Want to create a full packet, which is the Ethernet, IP, and TCP headers combined */
 
-module Packet_builder( input logic [8:0] addr,
+module Packet_builder( input logic clk, input logic rst, input logic [8:0] addr,
 							  input logic [31:0] ram_in,
 							  output logic [31:0] ram_out,
 							  input logic wren,
