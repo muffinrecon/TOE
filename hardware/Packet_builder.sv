@@ -1,17 +1,19 @@
 /*Want to create a full packet, which is the Ethernet, IP, and TCP headers combined */
 
-module Packet_builder( input logic clk, input logic rst, input logic [8:0] addr,
+module Packet_builder( input logic clk,
+								input logic rst,
+								input logic [8:0] addr,
 							  input logic [31:0] ram_in,
 							  output logic [31:0] ram_out,
 							  input logic wren,
 							  input logic [8:0] empty);
 
 	//for RAM reads
-	logic [8:0] addr;
-	logic [31:0] ram_in;
-	logic [31:0] ram_out;
-	logic wren;
-	logic [8:0] empty;
+	logic [8:0] address;
+	//logic [31:0] ram_in;
+	//logic [31:0] ram_out;
+	//logic wren;
+	//logic [8:0] empty;
 
 	logic [475:0] packet; /*Need to add on payload still..*/
 	logic [287:0] RAM_stored_header_data; /*stores the 32 (32x9 bits) bytes of 1 record*/
@@ -36,17 +38,15 @@ always_comb
 	begin
 		base_addr=7'd0;
 		case(current_state)
-			begin
-			idle: addr=base_addr;
-			continue_one: addr=base_addr+7'd1;
-			continue_two: addr=base_addr+7'd2;
-			continue_three: addr=base_addr+7'd3;
-			continue_four: addr=base_addr+7'd4;
-			continue_five: addr=base_addr+7'd5;
-			continue_six: addr=base_addr+7'd6;
-			continue_seven: addr=base_addr+7'd7;
-			default:addr=base_addr;
-			end
+			idle: address=base_addr;
+			continue_one: address=base_addr+7'd1;
+			continue_two: address=base_addr+7'd2;
+			continue_three: address=base_addr+7'd3;
+			continue_four: address=base_addr+7'd4;
+			continue_five: address=base_addr+7'd5;
+			continue_six: address=base_addr+7'd6;
+			continue_seven: address=base_addr+7'd7;
+			default:address=base_addr;
 		endcase
 	end
 	
@@ -57,22 +57,23 @@ always_ff@(posedge clk)
 		case (hl_state) 
 			hl_IDLE : 
 				begin 
-					case (req) 
+					case (1) 
 						2'b01   :  hl_state <= hl_SEARCHING;
 						2'b10   :  hl_state <= hl_CHECKING;
 						default :  hl_state <= hl_IDLE;
 					endcase
 					valid_bit_high <=1'b0;
 				end 
-			h1_searching:
+			hl_SEARCHING:
 				begin
 				RAM_stored_header_data[286:255] <=ram_out[31:0]; /*Grabbing just the valid bit*/
 				end
-			hl_checking:
+			hl_CHECKING:
 				begin
 				if(RAM_stored_header_data[286]==1'b1) /*The valid bit is set high, so continue with operation*/
 					begin
 					valid_bit_high=1'b1;
+					end
 					end
 		endcase
 	end
@@ -132,7 +133,6 @@ always_ff @ (posedge clk)
 									RAM_stored_header_data[63:32] <= ram_out[31:0]; /*mac_dst*/
 									current_state <= continue_eight;	
 									end
-								end
 						    continue_eight: 
 									begin
 									RAM_stored_header_data[31:0] <= ram_out[31:0]; /*src_port + dst_port*/
