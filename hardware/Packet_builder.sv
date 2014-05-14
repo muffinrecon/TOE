@@ -19,7 +19,7 @@ module Packet_builder( 	input logic         clk,
 	RAM2 connection_RAM (.address (addr[7:0]), .clock (clk), .data(ram_in), .wren(wren), .q(ram_out));
 
 	/*These logic loads the data saved from RAM into RAM_stored_header_data*/
-	enum logic [1:0] {idle, continue_one, continue_two, continue_three, continue_four, continue_five, continue_six, continue_seven, done} current_state;
+	enum logic [3:0] {idle, continue_one, continue_two, continue_three, continue_four, continue_five, continue_six, continue_seven, done} current_state;
 
 /*****************THIS PORTION OF THE CODE GATHERS DATA FROM THE RAM**************************************************/
 
@@ -38,14 +38,14 @@ always_ff @ (posedge clk)
 	 else
 		begin
 					case(id_in)
-					   	begin
-						    7'b0: if(current_state==idle && rst) /*rst??*/
+					   	
+						    7'd0: if(current_state==idle && rst) /*rst??*/
 								begin
 								   RAM_stored_header_data[256:224] <= ram_out[31:0]; /*This is the valid bit--check at start of next case*/					
 								   current_state <= continue_one;			
 								   //ethernet_control_bit = 4'b1;	
 								end			
-						    7'b1: if(current_state==continue_one)
+						    7'd1: if(current_state==continue_one)
 							begin
 									if(RAM_stored_header_data[256]==1'b1) /*The valid bit is set high, so continue with operation*/
 								          begin
@@ -57,34 +57,34 @@ always_ff @ (posedge clk)
 								    	 current_state <= idle;
 							      	     	     end
 							end
-						    7'b2: if(current_state==continue_two)
+						    7'd2: if(current_state==continue_two)
 							begin
 								RAM_stored_header_data[191:160] <= ram_out[31:0]; /*ack*/
 								current_state <= continue_three;
 								//ethernet_control_bit = 4'b3;	
 							end
-						    7'b3: if(current_state==continue_three)
+						    7'd3: if(current_state==continue_three)
 							begin
 								RAM_stored_header_data[159:128] <= ram_out[31:0];  /*ip_src*/
 								//ethernet_control_bit = 4'b4;	
 							end
-						    7'b4: if(current_state==continue_four)
+						    7'd4: if(current_state==continue_four)
 							begin
 								RAM_stored_header_data[127:96] <= ram_out[31:0]; /*ip_dst*/
 								current_state <= continue_five;
 								
 							end
-						    7'b5: if(current_state==continue_five)
+						    7'd5: if(current_state==continue_five)
 							begin
 								RAM_stored_header_data[95:64] <= ram_out[31:0]; /*mac_src*/
 								current_state <= continue_six;	
 							end
-						    7'b6: if(current_state==continue_six)
+						    7'd6: if(current_state==continue_six)
 							begin
 								RAM_stored_header_data[63:32] <= ram_out[31:0]; /*mac_dst*/
 								current_state <= continue_seven;	
 							end
-						    7'b87: if(current_state==continue_seven)
+						    7'd7: if(current_state==continue_seven)
 							begin
 								RAM_stored_header_data[31:0] <= ram_out[31:0]; /*src_port + dst_port*/
 								current_state <= done;
@@ -138,41 +138,41 @@ always_comb
 			packet[508:460]<=RAM_stored_header_data[63:32] ; //mac_dst ????
 			//packet[459:412]<={}; //eth_src: 48 bits
 			packet[459:412]<=RAM_stored_header_data[95:64] ; //mac_src ????
-			packet[411:396]<={}; //eth_type: 16 bits
+			packet[411:396]<=16'b0; //eth_type: 16 bits
 
-			packet[395:392]<={}; //ip_ver: 4 bits
-			packet[391:388]<={}; //ip_hlen: 4 bits
-			packet[387:380]<={}; //ip_tos: 8 bits
-			packet[379:364]<={}; //ip_len: 16 bits
-			packet[363:348]<={}; //ip_id: 16 bits
-			packet[347:332]<={}; //ip_flag_frag_off: 16 bits
-			packet[331:324]<={}; //ip_ttl: 8 bits
-			packet[323:316]<={}; //ip_protocol: 8 bits
-			packet[315:300]<={}; //ip_checksum: 16 bits
+			packet[395:392]<=4'b0; //ip_ver: 4 bits
+			packet[391:388]<=4'b0; //ip_hlen: 4 bits
+			packet[387:380]<=8'b0; //ip_tos: 8 bits
+			packet[379:364]<=16'b0; //ip_len: 16 bits
+			packet[363:348]<=16'b0; //ip_id: 16 bits
+			packet[347:332]<=16'b0; //ip_flag_frag_off: 16 bits
+			packet[331:324]<=8'b0; //ip_ttl: 8 bits
+			packet[323:316]<=8'b0; //ip_protocol: 8 bits
+			packet[315:300]<=16'b0; //ip_checksum: 16 bits
 			//packet[299:268]<={}; //ip_src_addr: 32 bits
 			packet[299:268] <= RAM_stored_header_data[159:128];//ip_src_addr: 32 bits
 			//packet[267:236] <= {}; //ip_dst_addr: 32 bits
 			packet[267:236] <= RAM_stored_header_data[127:96];//ip_dst_addr: 32 bits 
-			packet[235:204]<={}; //ip_options: 32 bits
+			packet[235:204]<=32'b0; //ip_options: 32 bits
 
 			//packet[203:172]<={}; //tcp_src_ports: 32 bits
 			packet[203:172]<=RAM_stored_header_data[31:0]; //srcport 
-			packet[171:140]<={}; //tcp_dst_ports: 32 bits
+			packet[171:140]<=32'b0; //tcp_dst_ports: 32 bits
 			packet[203:172]<=RAM_stored_header_data[31:0]; //dstport
 			//packet[139:108]<={}; //tcp_seq_num: 32 bits
 			packet[139:108] <= RAM_stored_header_data[223:192];  	//tcp_seq_num: 32 bits	
-			packet[107:92]<={}; //tcp_len: 16 bits
-			packet[91:76]<={}; //tcp_checksum: 16 bits
-			packet[75:72]<={}; //tcp_offset: 4 bits
-			packet[71:56]<={};//tcp windowsize: 16 bits
+			packet[107:92]<=16'b0; //tcp_len: 16 bits
+			packet[91:76]<=16'b0; //tcp_checksum: 16 bits
+			packet[75:72]<=4'b0; //tcp_offset: 4 bits
+			packet[71:56]<=16'b0;//tcp windowsize: 16 bits
 			//packet[55:24]<={}; //tcp_ack: 32 bits
 			packet[55:24] <= RAM_stored_header_data[191:160]; //tcp_ack: 32 bits
-			packet[23:20]<={}; //tcpreserved: 4 bits
-			packet[19:16]<={}; //tcpflag 4 bits
-			packet[15:0]<={}; //tcppointer 16 bits
-
+			packet[23:20]<=4'b0; //tcpreserved: 4 bits
+			packet[19:16]<=4'b0; //tcpflag 4 bits
+			packet[15:0]<=16'b0;//tcppointer 16 bits
+		end
 			//packet[]<=RAM_stored_header_data[];
 		end
-   end
+   
 
 endmodule
