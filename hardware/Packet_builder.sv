@@ -70,7 +70,7 @@ always_ff@(posedge clk)
 				end
 			hl_CHECKING:
 				begin
-				if(RAM_stored_header_data[286]==1'b1) /*The valid bit is set high, so continue with operation*/
+				if(RAM_stored_header_data[255]==1'b1) /*The valid bit is set high, so continue with operation*/
 					begin
 					valid_bit_high=1'b1;
 					end
