@@ -1,4 +1,4 @@
-module PB_testbench;
+module PB_testbench_c;
 
 /*inputs to DUT are reg type and outputs are wire type VHDL*/
 
@@ -87,7 +87,7 @@ end
 //end
 
 //TOE t0(clk,reset,writedata,write,readdata, read,chipselect, address);
-Packet_builder pb0(.*);
+Packet_builder_c pb0(.*);
 endmodule
 
 
