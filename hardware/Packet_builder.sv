@@ -8,15 +8,12 @@ output logic [31:0] ram_out,
 input logic wren,
 input logic [8:0] empty);
 
-//for RAM reads
 logic [8:0] addr;
-//logic [31:0] ram_in;
-//logic [31:0] ram_out;
-//logic wren;
-//logic [8:0] empty;
-
 logic [475:0] packet; /*Need to add on payload still..*/
 logic [287:0] RAM_stored_header_data; /*stores the 32 (32x9 bits) bytes of 1 record*/
+logic [2:0] state;
+
+logic valid_bit_high_tx;
 
 //logic last_record;
 //assign last_record = (base_addr == 8'd224);
@@ -25,18 +22,25 @@ logic [287:0] RAM_stored_header_data; /*stores the 32 (32x9 bits) bytes of 1 rec
 //RAM2 connection_RAM (.address (addr[7:0]), .clock (clk), .data(ram_in), .wren(wren), .q(ram_out));
 
 /* States of the high-level automata */
-enum logic [1:0] {hl_IDLE, hl_SEARCHING, hl_CHECKING} hl_state;
-
+//enum logic [2:0] {hl_IDLE, hl_SEARCHING, hl_CHECKING, hl_DONE} hl_state;
+parameter hl_IDLE=3'b000;
+parameter hl_SEARCHING=3'b001;
+parameter hl_CHECKING=3'b010;
+parameter hl_EXTRA=3'b011;
 /*States of second-level automata */
 enum logic [4:0] {idle, continue_one, continue_two, continue_three, continue_four, continue_five, continue_six, continue_seven, continue_eight, done} current_state;
 
 /*****************THIS PORTION OF THE CODE GATHERS DATA FROM THE RAM**************************************************/
 
 logic [7:0] base_addr;
+logic unlock;
+logic valid_bit_high;
 
-always_comb
+//always_comb
+always@*
 begin
 	base_addr=7'd0;
+	//state<=2'b00;
 		case(current_state)
 			idle: addr=base_addr;
 			continue_one: addr=base_addr+7'd1;
@@ -50,97 +54,141 @@ begin
 		endcase
 end
 
-logic valid_bit_high;
 /*for the purpose of checking just valid*/
 always_ff@(posedge clk)
 	begin
-		case (hl_state)
-			hl_IDLE :
-				begin
-					case (1)
-						2'b01 : hl_state <= hl_SEARCHING;
-						2'b10 : hl_state <= hl_CHECKING;
-						default : hl_state <= hl_IDLE;
-					endcase
-					valid_bit_high <=1'b0;
-				end
-			hl_SEARCHING:
-				begin
-					RAM_stored_header_data[287:256] <=ram_out[31:0]; /*Grabbing just the valid bit*/
-				end
-			hl_CHECKING:
-				begin
-					if(RAM_stored_header_data[256]==1) /*The valid bit is set high, so continue with operation*/
+	
+		if(wren)// && current_state==done)//&& unlock==1) /*while ramsearcher is writing into ram*/
+			begin
+				//hl_state<=hl_IDLE;
+				state<=hl_IDLE;
+				//lock=1;
+				//unlock<=0;
+			end
+		else
+			begin /*ramsearcher is done writing into ram, so check*/
+			valid_bit_high <=1'b0;
+			//lock=0;
+			
+				case (state)
+					
+					hl_IDLE :
 						begin
-							valid_bit_high=1'b1;
+							//valid_bit_high <=1'b0;
+							//state<=state+1;
+							//lock=1;
+							//case(state)
+								//3'b01 : hl_state <= hl_SEARCHING;
+								//3'b10 : hl_state <= hl_CHECKING;
+								//3'b11 : hl_state <=hl_DONE;
+								//default : hl_state <= hl_IDLE;
+							//endcase
+							state<=hl_SEARCHING;
 						end
-				end
-		endcase
+					hl_SEARCHING:
+						begin
+							RAM_stored_header_data[287:256] <=ram_in[31:0]; /*Grabbing just the valid bit*/
+							state<=hl_CHECKING;
+							//lock=1;
+						end
+					hl_CHECKING:
+						begin
+							if(RAM_stored_header_data[256]==1) /*The valid bit is set high, so continue with operation*/
+								begin
+									valid_bit_high<=1'b1;
+									//valid_bit_high_tx<=valid_bit_high;
+									state<=hl_EXTRA;
+									//lock<=1;
+									end
+									else
+									begin
+								state<=hl_IDLE;
+								//valid_bit_high<=1'b1;
+								end
+									end
+					hl_EXTRA:
+							begin	
+								valid_bit_high_tx<=valid_bit_high;
+								state<=hl_IDLE;
+								end
+								
+						//end
+					//hl_DONE:
+						//begin	
+						//state<=3'b00;
+						//unlock<=1;
+						//end
+				endcase
+			end
 	end
 
 /*triggered by valid_bit_high*/
 always_ff @ (posedge clk)
 	begin
-		if(valid_bit_high) //address
-			begin
-				current_state <= idle;
-				//RAM_stored_header_data <= 287'b0;
-			end
-		else if(current_state==done)
+		
+		if(valid_bit_high_tx==1'b0)// && (lock==0||secondlock==0))
 			begin	
-				current_state <= idle;
+				current_state <= done;
 			end
-		else
+		else if(valid_bit_high_tx==1'b1) //address
 			begin
+				current_state <= idle;
+				//lock=1;
+				//RAM_stored_header_data <= 287'b0;
+			//end
+		//else
+			//begin
 				case(current_state)
 					idle:
 						begin
 							//RAM_stored_header_data[287:256] <= ram_out[31:0]; /*This is the valid bit--check at start of next case*/	
-							current_state <= continue_one;	
+							current_state <= continue_one;
+							
 						end	
 					continue_one:
 						begin
-							RAM_stored_header_data[255:224] <= ram_out[31:0]; /*seq*/
+							RAM_stored_header_data[255:224] <= ram_in[31:0]; /*seq*/
 							current_state <= continue_two;	
 						end
 					continue_two:
 						begin
-							RAM_stored_header_data[223:192] <= ram_out[31:0]; /*ack*/
+							RAM_stored_header_data[223:192] <= ram_in[31:0]; /*ack*/
 							current_state <= continue_three;
 						end
 					continue_three:
 						begin
-							RAM_stored_header_data[191:160] <= ram_out[31:0]; /*ip_src*/
+							RAM_stored_header_data[191:160] <= ram_in[31:0]; /*ip_src*/
 							current_state <= continue_four;
 						end
 					continue_four:
 						begin
-							RAM_stored_header_data[159:128] <= ram_out[31:0]; /*ip_dst*/
+							RAM_stored_header_data[159:128] <= ram_in[31:0]; /*ip_dst*/
 							current_state <= continue_five;
 						end
 					continue_five:
 						begin
-							RAM_stored_header_data[127:96] <= ram_out[31:0]; /*mac_src*/
+							RAM_stored_header_data[127:96] <= ram_in[31:0]; /*mac_src*/
 							current_state <= continue_six;	
 						end
 					continue_six:
 						begin
-							RAM_stored_header_data[95:64] <= ram_out[31:0]; /*half mac_dst and half mac_src*/
+							RAM_stored_header_data[95:64] <= ram_in[31:0]; /*half mac_dst and half mac_src*/
 							current_state <= continue_seven;	
 						end
 					continue_seven:
 						begin
-							RAM_stored_header_data[63:32] <= ram_out[31:0]; /*mac_dst*/
+							RAM_stored_header_data[63:32] <= ram_in[31:0]; /*mac_dst*/
 							current_state <= continue_eight;	
 						end
 					continue_eight:
 						begin
-							RAM_stored_header_data[31:0] <= ram_out[31:0]; /*src_port + dst_port*/
+							RAM_stored_header_data[31:0] <= ram_in[31:0]; /*src_port + dst_port*/
 							current_state <= done;
+							//lock=0;
 						end
 				endcase	
 			end
-		end
+	end
 
 
 /*****************THIS PORTION OF THE CODE MAKES THE PACKET**************************************************/
