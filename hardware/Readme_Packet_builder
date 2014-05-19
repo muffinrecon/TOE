@@ -1,1 +1,37 @@
-Readme for the Packet builder1.	Operates on high level and second level automata2.	The high level automata consists of: 	a.	hl_IDLE		i.	if wren is high from the RAM search, we go into this state. 		ii.	From here we continue through b-d	b.	hl_SEARCHING		i.	grabs the valid bit	c.	hl_CHECKING		i.	checks the valid bit	d.	hl_EXTRA		i.	sets the valid bit and then sets the transfer valid bit as the valid bit3.	The second level automata is:	a.	idle		i.	go into the case loop	b.	continue_one		i.	grabbing ram_in to RAM_stored_header_data	c.	continue_two		i.	grabbing ram_in to RAM_stored_header_data	d.	continue_three		i.	grabbing ram_in to RAM_stored_header_data	e.	continue_four		i.	grabbing ram_in to RAM_stored_header_data	f.	continue_five		i.	grabbing ram_in to RAM_stored_header_data	g.	continue_six		i.	grabbing ram_in to RAM_stored_header_data	h.	continue_seven		i.	grabbing ram_in to RAM_stored_header_data	i.	continue_eight		i.	grabbing ram_in to RAM_stored_header_data	j.	done		i.	when valid-bit is 0 (a non-state)4.	The important triggers from high to second level automata is the valid_bit_high5.	Some issue ran into was that valid_bit high was being used as both a trigger for the second-level automata and as the initial state that causes you to go into the virtual loop in the high-level. This was solved by setting valid_bit_tx to valid_bit_high, and using that as the trigger for the second-level automata, while proceeding to do the same thing as before with valid_bit_high.6.	When current state is done, then RAM_stored_header_data is placed into packet.
+Readme for the Packet builder_c
+
+1.	Operates on high level and second level automata
+2.	The high level automata consists of: 
+	a.	hl_IDLE
+		i.	if wren is high from the RAM search, we go into this state. 
+		ii.	From here we continue through b-d
+	b.	hl_SEARCHING
+		i.	grabs the valid bit
+	c.	hl_CHECKING
+		i.	checks the valid bit
+	d.	hl_EXTRA
+		i.	sets the valid bit and then sets the transfer valid bit as the valid bit
+3.	The second level automata is:
+	a.	idle
+		i.	go into the case loop
+	b.	continue_one
+		i.	grabbing ram_in to RAM_stored_header_data
+	c.	continue_two
+		i.	grabbing ram_in to RAM_stored_header_data
+	d.	continue_three
+		i.	grabbing ram_in to RAM_stored_header_data
+	e.	continue_four
+		i.	grabbing ram_in to RAM_stored_header_data
+	f.	continue_five
+		i.	grabbing ram_in to RAM_stored_header_data
+	g.	continue_six
+		i.	grabbing ram_in to RAM_stored_header_data
+	h.	continue_seven
+		i.	grabbing ram_in to RAM_stored_header_data
+	i.	continue_eight
+		i.	grabbing ram_in to RAM_stored_header_data
+	j.	done
+		i.	when valid-bit is 0 (a non-state)
+4.	The important triggers from high to second level automata is the valid_bit_high
+5.	Some issue ran into was that valid_bit high was being used as both a trigger for the second-level automata and as the initial state that causes you to go into the virtual loop in the high-level. This was solved by setting valid_bit_tx to valid_bit_high, and using that as the trigger for the second-level automata, while proceeding to do the same thing as before with valid_bit_high.
+6.	When current state is done, then RAM_stored_header_data is placed into packet.
