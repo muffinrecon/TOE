@@ -1,0 +1,93 @@
+module PB_testbench_c;
+
+/*inputs to DUT are reg type and outputs are wire type VHDL*/
+
+/*Packet_builder*/
+logic clk;
+logic reset;
+reg [8:0] address;
+reg [31:0] ram_in;
+wire [31:0] ram_out;
+logic wren;
+reg [8:0] empty;
+//logic valid_bit_high;
+//logic [475:0] packet; /*Need to add on payload still..*/
+//logic [287:0] RAM_stored_header_data; /*stores the 32 (32x9 bits) bytes of 1 record*/
+//enum logic [1:0] {hl_IDLE, hl_SEARCHING, hl_CHECKING} hl_state;
+
+/*States of second-level automata */
+enum logic [4:0] {idle, continue_one, continue_two, continue_three, continue_four, continue_five, continue_six, continue_seven, continue_eight, done} current_state;
+
+
+//TOE t0(.*);
+
+
+initial 
+begin
+//reset=0;
+//valid_bit_high=1'b0;
+wren=1;
+//reset=1'b1;
+address=4'b0;
+
+end
+
+
+
+initial
+begin
+clk=1'b0;
+forever
+#20 clk= ~clk;
+
+
+end
+
+initial
+begin
+#40 ram_in=00000000000000000000000000000001; //valid-bit-high
+#80 ram_in=32'b1;
+#120 ram_in=32'b0;
+#160 ram_in=32'b1;
+#200 ram_in=32'b0;
+#240 ram_in = 32'b1;
+#260 ram_in=32'b0;
+#300 ram_in=32'b1;
+#340 wren=~wren;
+//#120 reset=~reset;
+end
+
+//always@(posedge clk)
+//begin
+//#40 ram_in=00000000000000000000000000000001; //valid-bit-high
+//#80 ram_in=32'b1;
+//#120 ram_in=32'b0;
+//#200 wren=~wren; /*whether it gets to the last hl_state depends on when wren latches down*/
+//#200 reset=~reset;
+//end
+
+//always@(posedge clk)
+//ram_in=32'b1;
+
+//always@(posedge clk)
+//ram_in=32'b1;
+
+//always@(posedge clk)
+//ram_in=32'b1;
+
+//always@(posedge clk)
+//ram_in=32'b1;
+
+//always@(posedge clk)
+//ram_in=32'b1;
+
+//begin
+//wren=~wren;
+//valid_bit_high=~valid_bit_high;
+//end
+
+//TOE t0(clk,reset,writedata,write,readdata, read,chipselect, address);
+Packet_builder_c pb0(.*);
+endmodule
+
+
